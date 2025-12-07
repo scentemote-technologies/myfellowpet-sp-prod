@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="MyFellowPet is a one-stop digital platform that connects pet parents with a curated network of trusted service providers—covering boarding, grooming, veterinary care, retail supplies and compassionate farewell services. By offering seamless booking, verified reviews and personalized support, we make it easy to find the right care for every stage of your pet’s life.">
+  <meta name="google-signin-client_id" content="442628504378-mr068vg9950qg17iom0dlbms440j2keu.apps.googleusercontent.com">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="MyFellowPet">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>MyFellowPet</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script src="https://www.google.com/recaptcha/api.js?render=6LdEcQgsAAAAAKX0ZY2b34rZM4_xHb0Fkav-z6Zi" async defer></script>
+  <script
+          src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsJxN61Qqdxh0ajA6MdRYwMWVOOujw8ro&libraries=places"
+          async
+          defer
+  ></script>
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+
+  <script>
+    window.getPlacePredictions = (input, sessionToken) => {
+      return new Promise((resolve, reject) => {
+        const svc = new google.maps.places.AutocompleteService();
+        svc.getPlacePredictions({
+          input,
+          componentRestrictions: { country: 'in' },
+          sessionToken: new google.maps.places.AutocompleteSessionToken()
+        }, (preds, status) => {
+          status === google.maps.places.PlacesServiceStatus.OK
+            ? resolve(preds)
+            : reject(status);
+        });
+      });
+    };
+
+    window.getPlaceDetails = (placeId, sessionToken) => {
+      return new Promise((resolve, reject) => {
+        const div = document.createElement('div');
+        const svc = new google.maps.places.PlacesService(div);
+        svc.getDetails({
+          placeId,
+          fields: ['geometry'],
+          sessionToken: new google.maps.places.AutocompleteSessionToken()
+        }, (place, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK) {
+            resolve(place.geometry.location.toJSON());
+          } else {
+            reject(status);
+          }
+        });
+      });
+    };
+
+    function reverseGeocodeJs(lat, lng) {
+      return new Promise((resolve, reject) => {
+        const geocoder = new google.maps.Geocoder();
+        const latlng = { lat: parseFloat(lat), lng: parseFloat(lng) };
+
+        geocoder.geocode({ location: latlng, language: 'en' }, (results, status) => {
+          if (status === "OK" && results[0]) {
+            let streetNumber = "";
+            let route = "";
+            let postalCode = "";
+            let area = "";
+            let district = "";
+            let state = "";
+            const components = results[0].address_components;
+            for (const comp of components) {
+              const types = comp.types;
+              if (types.includes("street_number")) streetNumber = comp.long_name;
+              if (types.includes("route")) route = comp.long_name;
+            }
+            const street = (streetNumber && route) ? (streetNumber + " " + route) : (route || streetNumber || "");
+            for (const comp of components) {
+              if (comp.types.includes("postal_code")) {
+                postalCode = comp.long_name;
+                break;
+              }
+            }
+            for (const comp of components) {
+              if (comp.types.includes("sublocality_level_1")) {
+                area = comp.long_name;
+                break;
+              }
+            }
+            if (!area) {
+              for (const comp of components) {
+                const types = comp.types;
+                if (types.includes("sublocality") || types.includes("neighborhood") || types.includes("postal_town")) {
+                  area = comp.long_name;
+                  break;
+                }
+              }
+            }
+            for (const comp of components) {
+              if (comp.types.includes("administrative_area_level_2")) {
+                district = comp.long_name;
+                break;
+              }
+            }
+            for (const comp of components) {
+              if (comp.types.includes("administrative_area_level_1")) {
+                state = comp.long_name;
+                break;
+              }
+            }
+            resolve({
+              street: street,
+              postalCode: postalCode,
+              area: area,
+              district: district,
+              state: state
+            });
+          } else {
+            reject("Geocoder failed: " + status);
+          }
+        });
+      });
+    }
+  </script>
+
+  <script>
+    function hideLoadingSplash() {
+      const splash = document.getElementById('loading-splash');
+      if (splash) {
+        // 1. Get the Lottie player element
+        const lottiePlayer = splash.querySelector('lottie-player');
+
+        // 2. Explicitly stop the animation
+        if (lottiePlayer) {
+          lottiePlayer.pause(); // Or stop() if supported
+        }
+
+        // 3. Hide the entire splash div
+        splash.style.display = 'none';
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #F0F8F8;
+    }
+    body.is-refresh #loading-splash {
+      display: none !important;
+    }
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      background-color: #F0F8F8;
+      font-family: Poppins, sans-serif;
+      color: #555;
+    }
+  </style>
+
+</head>
+<body>
+
+
+
+<div id="loading-splash">
+  <lottie-player
+          src="assets/animations/Loading.json"
+          background="transparent"
+          speed="1"
+          style="width: 250px; height: 250px;"
+          loop
+          autoplay>
+  </lottie-player>
+  <p>Loading...</p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="flutter_bootstrap.js" defer></script>
+
+</body>
+</html>

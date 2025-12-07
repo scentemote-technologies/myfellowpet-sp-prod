@@ -1,0 +1,364 @@
+import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' show AuthCredential, FirebaseAuth, GoogleAuthProvider, User, UserCredential;
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../Boarding/EmployeeSignInPage.dart';
+import 'partner_appbar.dart';
+
+
+final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+class SignInPage extends StatefulWidget {
+  @override
+  _SignInPageState createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  // Firebase instances
+  final _auth      = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+
+  // Sign-in state
+  bool _isLoading    = false;
+  String _errorMessage = '';
+
+  // Other state variables (kept from original code)
+  final List<String> _generalStepTitles = [
+    "Business Details",
+    "Proof & Compliance",
+    "Review & Activation"
+  ];
+
+  final List<String> _stepSubtitles = [
+    "Name, Email & Phone Number",
+    "Shop name, CIN & logo",
+    "IFSC & Account number",
+    "Shop name, CIN & logo",
+    "Service Details",
+    "Upload Signed Agreement"
+  ];
+  final List<String> _menuItems = ['Home', 'Products', 'About', 'Contact'];
+  bool _noGstCheckbox = false;
+
+
+  final ImagePicker _picker = ImagePicker();
+  Uint8List? _imageBytes;
+  String? _uploadedLogoUrl;
+
+  int _selectedIndex = 0;
+  int? _hoveredIndex;
+
+  int _currentCarouselIndex = 0;
+  final PageController _pageController = PageController();
+
+
+  @override
+  void initState() {
+    super.initState();
+    // No initialization needed for Google Sign-In
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // In _SignInPageState
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _errorMessage = '';
+      _isLoading = true;
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser != null) {
+        final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        // Sign in with Firebase
+        await _auth.signInWithCredential(credential);
+        print("✅ Google Sign-in successful. UserNotifier will now take over.");
+      }
+    } catch (e) {
+      print("🔥 Google Sign-in failed: $e");
+
+      final error = e.toString();
+
+      if (error.contains("popup_closed")) {
+        // ✅ Ignore when user closes the popup manually
+        print("ℹ️ Google sign-in popup was closed by the user.");
+      } else {
+        // ✅ Show friendly message instead of raw error
+        setState(() {
+          _errorMessage = "Sign-in failed. Please try again.";
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+
+  Widget _buildLoginCard() {
+    return Container(
+      width: 360,
+      padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black, width: 0.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('company_documents')
+                .doc('general_info')
+                .get(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return SizedBox(
+                  height: 180,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              } else if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                return SizedBox(
+                  height: 180,
+                  child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                );
+              } else {
+                final imageUrl = snapshot.data!['main_image'];
+                return Container(
+                  height: 200,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                );
+              }
+            },
+          ),
+
+          SizedBox(height: 8),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+              children: <TextSpan>[
+                TextSpan(text: 'Sign in to '),
+                TextSpan(
+                  text: 'Login/Register',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+
+          // Google Sign-In button
+          OutlinedButton(
+            onPressed: _isLoading ? null : _signInWithGoogle,
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(double.infinity, 48),
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              side: BorderSide(color: primaryColor, width: 2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              textStyle: GoogleFonts.poppins(fontSize: 16),
+            ),
+            child: _isLoading
+                ? SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset('assets/google_logo.png', height: 24.0),
+                SizedBox(width: 8.0),
+                Text('Sign in with Google'),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 16),
+
+          if (_errorMessage.isNotEmpty)
+            Text(
+              _errorMessage,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: Colors.red,
+              ),
+            ),
+
+          SizedBox(height: 16),
+
+
+
+          SizedBox(height: 16),
+          FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('company_documents')
+                .doc('footer')
+                .get(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData || !snapshot.data!.exists) {
+                return const SizedBox();
+              }
+
+              final data = snapshot.data!.data() as Map<String, dynamic>?;
+              final phoneNumber = data?['phone_number'] ?? '';
+
+              if (phoneNumber.isEmpty) {
+                return const SizedBox();
+              }
+
+              return Align(
+                alignment: Alignment.centerRight,
+                child: SelectableText.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Contact Us ',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      TextSpan(
+                        text: phoneNumber,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget buildFooterLinks() {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('company_documents')
+          .doc('footer')
+          .get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox();
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return SizedBox();
+        }
+
+        final data = snapshot.data!;
+        final termsUrl = data['terms_of_use'];
+        final privacyUrl = data['privacy_policy'];
+        final cancelUrl = data['cancellation_refund'];
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 32.0, bottom: 16),
+          child: Column(
+            children: [
+              Text(
+                'By continuing, you agree to our',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 6),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                children: [
+                  _buildFooterLink('Terms of Use', termsUrl),
+                  Text('|', style: TextStyle(color: Colors.grey)),
+                  _buildFooterLink('Privacy Policy', privacyUrl),
+                  Text('|', style: TextStyle(color: Colors.grey)),
+                  _buildFooterLink('Cancellation & Refund', cancelUrl),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  Widget _buildFooterLink(String label, String url) {
+    return GestureDetector(
+      onTap: () async {
+        if (await canLaunchUrl(Uri.parse(url))) {
+          await launchUrl(Uri.parse(url));
+        }
+      },
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          color: Colors.grey.shade700,
+          fontSize: 12,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      key: _scaffoldKey,
+      appBar: PartnerAppbar(scaffoldKey: _scaffoldKey),
+      drawer: PartnerAppbar.buildMobileDrawer(context),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 50),
+          child: Center(
+            child: Column(
+              children: [
+                _buildLoginCard(),
+                buildFooterLinks(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
