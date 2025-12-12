@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -e
 
+echo "🚀 Installing Flutter..."
+
+# Clone Flutter SDK
+git clone https://github.com/flutter/flutter.git -b stable
+export PATH="$PATH:$(pwd)/flutter/bin"
+
+flutter --version
+flutter config --enable-web
+flutter doctor
+
+echo "🏗️ Building Flutter Web..."
+
 flutter build web --release \
   --dart-define=FIREBASE_API_KEY=$FIREBASE_API_KEY \
   --dart-define=PLACES_API_KEY=$PLACES_API_KEY \
