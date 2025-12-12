@@ -3,34 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class WhatsAppSender {
-  final String accountSid = 'AC34b0df0f2784f2344405bbbafb374f10'; // Twilio Account SID
-  final String authToken = '61e17f9489362d59e045541642f45253';  // Twilio Auth Token
-  final String fromPhone = 'whatsapp:+14155238886';   // Twilio sandbox WhatsApp number
-
-  Future<void> sendWhatsAppMessage(String toPhone, String message) async {
-    final url = Uri.parse('https://api.twilio.com/2010-04-01/Accounts/$accountSid/Messages.json');
-    final credentials = '$accountSid:$authToken';
-
-    final response = await http.post(url,
-      headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(credentials)),
-      },
-      body: {
-        'From': fromPhone,  // Sender's WhatsApp number
-        'To': 'whatsapp:$toPhone',  // Recipient's WhatsApp number
-        'Body': message,  // The message to send
-      },
-    );
-
-    if (response.statusCode == 200) {
-      print('Message sent successfully!');
-    } else {
-      print('Failed to send message: ${response.statusCode} - ${response.body}');
-    }
-  }
-}
-
 class EnrollmentFormPage extends StatefulWidget {
   final String courseName;
   final String uid;
@@ -61,15 +33,7 @@ class _EnrollmentFormPageState extends State<EnrollmentFormPage> {
 
   bool isLoading = false; // Track the loading state
 
-  final WhatsAppSender _whatsAppSender = WhatsAppSender();
 
-  // Method to send WhatsApp message automatically once the form is submitted
-  Future<void> sendWhatsAppMessage(String phoneNumber) async {
-    String message = "Hello $firstName, your application for the course '${widget.courseName}' has been successfully submitted. We will contact you soon!";
-
-    // Send WhatsApp message using Twilio API
-    await _whatsAppSender.sendWhatsAppMessage(phoneNumber, message);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +262,6 @@ class _EnrollmentFormPageState extends State<EnrollmentFormPage> {
                       });
 
                       // Send WhatsApp message to user via Twilio
-                      await _whatsAppSender.sendWhatsAppMessage(formattedPhoneNumber, "Hello $firstName, your enrollment for the course '${widget.courseName}' has been successfully submitted.");
 
                       setState(() {
                         isLoading = false; // Stop loading

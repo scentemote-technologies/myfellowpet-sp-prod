@@ -11,7 +11,6 @@ import 'package:cloud_functions/cloud_functions.dart';
     import 'package:flutter/services.dart';
     import 'package:flutter_typeahead/flutter_typeahead.dart';
     import 'package:geolocator/geolocator.dart';
-    import 'package:go_router/go_router.dart';
     import 'package:google_fonts/google_fonts.dart';
     import 'package:google_maps_flutter/google_maps_flutter.dart';
     import 'package:image_picker/image_picker.dart';
@@ -20,13 +19,15 @@ import 'package:cloud_functions/cloud_functions.dart';
     import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
     import 'package:multi_select_flutter/util/multi_select_item.dart';
     import 'package:http/http.dart' as http;
+import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
 import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
     import 'package:provider/provider.dart';
   import 'package:url_launcher/url_launcher.dart';
     import 'dart:typed_data';
 
     import '../../Colors/AppColor.dart';
-  import '../../services/places_service.dart';
+  import '../../providers/boarding_details_loader.dart';
+import '../../services/places_service.dart';
     import '../../tools/webcam_selfie_widget.dart';
     class PetType {
       final String id;
@@ -1971,11 +1972,11 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
       Future<void> _validatePhone(String phone) async {
         if (phone.trim().length != 10) return;
         setState(() { _isCheckingPhone = true; _phoneErrorText = null; });
-        final query = await FirebaseFirestore.instance.collection('users-sp-boarding')
-            .where('owner_phone', whereIn: [phone.trim(), '+91${phone.trim()}']).limit(1).get();
+      /*  final query = await FirebaseFirestore.instance.collection('users-sp-boarding')
+            .where('owner_phone', whereIn: [phone.trim(), '+91${phone.trim()}']).limit(1).get();*/
         if (!mounted) return;
         setState(() {
-          _phoneErrorText = query.docs.isNotEmpty ? 'This phone number is already registered.' : null;
+         // _phoneErrorText = query.docs.isNotEmpty ? 'This phone number is already registered.' : null;
           _isCheckingPhone = false;
         });
       }
@@ -2027,7 +2028,6 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
         if (!mounted) return;
         setState(() {
           // If a Firestore duplicate is found, set that error.
-          _dashboardWhatsappErrorText = query.docs.isNotEmpty ? 'This Whatsapp number is already registered.' : null;
           _isCheckingWhatsappPhone = false;
         });
       }
@@ -2039,7 +2039,6 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
             .where('notification_email', isEqualTo: email.trim()).limit(1).get();
         if (!mounted) return;
         setState(() {
-          _emailErrorText = query.docs.isNotEmpty ? 'This email address is already registered.' : null;
           _isCheckingEmail = false;
         });
       }
@@ -2146,10 +2145,6 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
       }
       Future<String?> _checkForDuplicates() async {
         final collection = FirebaseFirestore.instance.collection('users-sp-boarding');
-        final phoneQuery = await collection.where('owner_phone', whereIn: [_phoneCtrl.text.trim(), '+91${_phoneCtrl.text.trim()}']).limit(1).get();
-        if (phoneQuery.docs.isNotEmpty) return 'This phone number is already registered.';
-        final emailQuery = await collection.where('login_email', isEqualTo: _emailCtrl.text.trim()).limit(1).get();
-        if (emailQuery.docs.isNotEmpty) return 'This email address is already registered.';
         final panQuery = await collection.where('pan', isEqualTo: _panCtrl.text.trim()).limit(1).get();
         if (panQuery.docs.isNotEmpty) return 'This PAN number is already registered.';
         return null;
@@ -2462,8 +2457,23 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
           if (mounted) {
             await Provider.of<UserNotifier>(context, listen: false).refreshUserProfile();
             final userNotifier = Provider.of<UserNotifier>(context, listen: false);
+
             if (userNotifier.authState == AuthState.authenticated && userNotifier.me != null) {
-              context.go('/partner/${userNotifier.me!.serviceId}/profile');
+              final serviceId = userNotifier.me!.serviceId;
+
+              // 🚀 REPLACING context.go('/partner/$serviceId/profile')
+              // We use pushAndRemoveUntil here to clear the navigation history
+              // (e.g., login screens) below the main dashboard.
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => PartnerShell(
+                    serviceId: serviceId, // serviceId is guaranteed non-null here
+                    currentPage: PartnerPage.profile, // Directing to the main profile page
+                    child: BoardingDetailsLoader(serviceId: serviceId), // The widget that loads the profile content
+                  ),
+                ),
+                    (Route<dynamic> route) => false, // Clears the history
+              );
             }
           }
         } catch (e, st) {
@@ -2538,7 +2548,14 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
         );
       }
 
+      // lib/screens/ShopDetailsPage.dart -> in _HomeboarderonboardpageState
+
+// 🔽🔽🔽 CORRECTED FUNCTION SIGNATURE (Removed argument, using State context) 🔽🔽🔽
       Widget _buildFancyStepIndicator() {
+        // Assuming primaryColor and successColor are defined in the file scope
+        const Color primaryColor = Color(0xFF2CB4B6);
+        const Color successColor = Colors.greenAccent;
+
         return Container(
           width: 280,
           decoration: const BoxDecoration(
@@ -2553,22 +2570,59 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.only(bottom: 50),
-                child: Text(
-                  'Partner Onboarding',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                padding: const EdgeInsets.only(bottom: 20),
+                child:
+                // --- White Circle Wrapper ---
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white, // The white background
+                    shape: BoxShape.circle,
+                    // Optional: Add a subtle shadow
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    // Change the icon color to black to contrast with the white circle
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    // We use some padding here for spacing within the circle.
+                    padding: const EdgeInsets.all(8),
+                    // Remove constraints since the Container is defining the size/shape
+                    constraints: const BoxConstraints(),
                   ),
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 50),
+                child:
+                    // ----------------------
+                    Text(
+                      'Partner Onboarding',
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+              ),
+
               Expanded(
                 child: ListView.builder(
+                  // NOTE: _stepTitles is a state variable and is now correctly accessible
                   itemCount: _stepTitles.length,
                   itemBuilder: (context, i) {
+                    // 🚀 FIX: _currentStep and _highestStepReached are State variables,
+                    // no need for local declaration, solving the original error.
                     final isCompleted = i < _currentStep;
                     final isActive = i == _currentStep;
+
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 24.0),
                       child: InkWell(
@@ -2578,7 +2632,6 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
                             setState(() {
                               _currentStep = i;
                               // ✅ THE FIX: When you navigate back, this becomes the new highest step.
-                              // This prevents jumping forward again without re-validating.
                               _highestStepReached = i;
                             });
                           }
@@ -2619,7 +2672,7 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
                                       ),
                                     ),
                                     Text(
-                                      _stepSubtitles[i],
+                                      _stepSubtitles[i], // NOTE: This also relies on being a State variable
                                       style: GoogleFonts.poppins(
                                         fontSize: 12,
                                         color: Colors.white.withOpacity(0.7),
@@ -2640,6 +2693,13 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
           ),
         );
       }
+// ---------------------------------------------------------------------------------
+
+// You must also fix the call site (where this widget is used):
+// Find this line (previously line 4170)
+// _buildFancyStepIndicator(context),
+// And change it to:
+// _buildFancyStepIndicator(),
 
 
       Widget _buildCurrentStepContent({required bool isDesktop}) {
@@ -4279,23 +4339,61 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
 
       // --- END VISUAL REFRESH ---
 
-      // Find this at the end of your file
       @override
       Widget build(BuildContext context) {
-        // THIS IS THE KEY CHANGE
+        // We use the primaryColor and textColor variables defined in your code
+        const Color primaryColor = Color(0xFF2CB4B6);
+        const Color textColor = Colors.black87;
+
         return Scaffold(
-          backgroundColor: backgroundColor,
+          backgroundColor: Colors.white,
+
+          // 🚀 FIXED: Wrapped the LayoutBuilder logic inside PreferredSize.
+          appBar: PreferredSize(
+            // Set the standard height of an AppBar
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // We check the width here. I've set the breakpoint to 760px.
+                final bool isDesktop = constraints.maxWidth > 760;
+
+                // Only return an AppBar if we are NOT on desktop
+                if (!isDesktop) {
+                  return AppBar(
+                    // Back Arrow with Pop functionality
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new, color: textColor),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // Title for the onboarding flow
+                    title: Text(
+                      'Partner Onboarding',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: textColor),
+                    ),
+                    backgroundColor: Colors.white,
+                    foregroundColor: textColor,
+                    elevation: 1,
+                  );
+                }
+                // Return an empty/zero-sized widget when on desktop
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+
+          // The main body remains the same
           body: LayoutBuilder(
             builder: (context, constraints) {
-              // We check the width here. I've set the breakpoint to 760px.
               final bool isDesktop = constraints.maxWidth > 760;
 
               if (isDesktop) {
                 // If the screen is WIDE, return the desktop layout
-                return _buildDesktopLayout(); // This contains your original Row layout
+                return _buildDesktopLayout();
               } else {
                 // If the screen is NARROW, return the new mobile layout
-                return _buildMobileLayout(); // This contains a new Column layout
+                return _buildMobileLayout();
               }
             },
           ),
@@ -4330,14 +4428,6 @@ import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
             if (!_isWhatsappSameAsPhone && !_whatsappVerified) {
               validationErrors.add('Verified WhatsApp Number');
             }
-
-            // ✅ TWEAK HERE: Conditional WhatsApp Duplicate Check
-            if (!_isWhatsappSameAsPhone && _dashboardWhatsappErrorText != null) {
-              validationErrors.add('the WhatsApp number is already taken');
-            }
-
-            if (_phoneErrorText != null) validationErrors.add('the phone number is already taken');
-            if (_emailErrorText != null) validationErrors.add('the email address is already taken');
 
             break;
           case 1: // Service Information

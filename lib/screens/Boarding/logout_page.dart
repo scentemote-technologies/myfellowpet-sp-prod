@@ -1,6 +1,5 @@
 import 'dart:html' as html;
 import 'dart:convert';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../Partner/email_signin.dart';
 import 'edit_service_info/Edit_Profile_Page.dart';
 
 
@@ -40,26 +40,26 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> fetchOwnerDetails() async {
     try {
       final userDoc = await FirebaseFirestore.instance
-              .collection('users-sp-boarding')
-              .doc(widget.serviceId)
-              .get();
+          .collection('users-sp-boarding')
+          .doc(widget.serviceId)
+          .get();
 
-          if (userDoc.exists) {
-            final data = userDoc.data();
-            setState(() {
-              ownerName = data?['owner_name'] ?? '';
-              shop_user_id = data?['shop_user_id'] ?? '';
-              ownerEmail = data?['notification_email'] ?? '';
-              ownerPhone = data?['owner_phone'] ?? '';
-              loadingOwnerDetails = false;
-            });
-          }
-
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        setState(() {
+          ownerName = data?['owner_name'] ?? '';
+          shop_user_id = data?['shop_user_id'] ?? '';
+          ownerEmail = data?['login_email'] ?? '';
+          ownerPhone = data?['owner_phone'] ?? '';
+          loadingOwnerDetails = false;
+        });
+      }
     } catch (e) {
       print('Error fetching owner details: $e');
       setState(() => loadingOwnerDetails = false);
     }
   }
+
   Future<void> _launchUrlFromFirestore(String fieldName) async {
     final messenger = ScaffoldMessenger.of(context);
 
@@ -91,14 +91,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-  final me = context.watch<UserNotifier>().me;
+    final me = context
+        .watch<UserNotifier>()
+        .me;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        automaticallyImplyLeading: false, // 🚀 disables the back arrow
+        automaticallyImplyLeading: false,
+        // 🚀 disables the back arrow
 
-        title: Text('Account', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text(
+            'Account', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
         backgroundColor: Colors.white,
         elevation: 1,
         iconTheme: const IconThemeData(color: Colors.black87),
@@ -126,9 +130,12 @@ class _SettingsPageState extends State<SettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Name: $ownerName', style: GoogleFonts.poppins(fontSize: 14)),
-                          Text('Email: $ownerEmail', style: GoogleFonts.poppins(fontSize: 14)),
-                          Text('Phone: $ownerPhone', style: GoogleFonts.poppins(fontSize: 14)),
+                          Text('Name: $ownerName',
+                              style: GoogleFonts.poppins(fontSize: 14)),
+                          Text('Email: $ownerEmail',
+                              style: GoogleFonts.poppins(fontSize: 14)),
+                          Text('Phone: $ownerPhone',
+                              style: GoogleFonts.poppins(fontSize: 14)),
                         ],
                       ),
                     ),
@@ -137,16 +144,18 @@ class _SettingsPageState extends State<SettingsPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => EditProfilePage(
-                            serviceId: widget.serviceId,
-                            currentEmail: ownerEmail!,
-                            currentPhone: ownerPhone!,
-                          ),
+                          builder: (_) =>
+                              EditProfilePage(
+                                serviceId: widget.serviceId,
+                                currentEmail: ownerEmail!,
+                                currentPhone: ownerPhone!,
+                              ),
                         ),
                       );
                     },
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Color(0xFF2CB4B6),
                         borderRadius: BorderRadius.circular(8),
@@ -202,8 +211,6 @@ class _SettingsPageState extends State<SettingsPage> {
             // Shop Owner Info
 
 
-
-
             /* ListTile(
               leading: Icon(Icons.lock, color: Colors.blue),
               title: Text('Change Password', style: GoogleFonts.poppins()),
@@ -235,7 +242,8 @@ class _SettingsPageState extends State<SettingsPage> {
               const Divider(height: 32),
 
             if (me?.role != 'Staff')
-              Text('App Information', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text('App Information', style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             if (me?.role != 'Staff')
               FutureBuilder<DocumentSnapshot>(
@@ -246,7 +254,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return ListTile(
-                      leading: Icon(Icons.info_outline, color: Color(0xFF2CB4B6)),
+                      leading: Icon(
+                          Icons.info_outline, color: Color(0xFF2CB4B6)),
                       title: Text('App Version', style: GoogleFonts.poppins()),
                       trailing: const SizedBox(
                         width: 16,
@@ -254,15 +263,19 @@ class _SettingsPageState extends State<SettingsPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     );
-                  } else if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+                  } else if (snapshot.hasError || !snapshot.hasData ||
+                      !snapshot.data!.exists) {
                     return ListTile(
-                      leading: Icon(Icons.info_outline, color: Color(0xFF2CB4B6)),
+                      leading: Icon(
+                          Icons.info_outline, color: Color(0xFF2CB4B6)),
                       title: Text('App Version', style: GoogleFonts.poppins()),
-                      trailing: Text('Unavailable', style: GoogleFonts.poppins()),
+                      trailing: Text(
+                          'Unavailable', style: GoogleFonts.poppins()),
                     );
                   }
 
-                  final version = snapshot.data!.get('myfellowpet_web_app_version') ?? 'Unknown';
+                  final version = snapshot.data!.get(
+                      'myfellowpet_web_app_version') ?? 'Unknown';
 
                   return ListTile(
                     leading: Icon(Icons.info_outline, color: Color(0xFF2CB4B6)),
@@ -277,21 +290,23 @@ class _SettingsPageState extends State<SettingsPage> {
             // Help & Feedback
             if (me?.role != 'Staff')
 
-              Text('Support', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text('Support', style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             if (me?.role != 'Staff')
 
               ListTile(
-              leading: Icon(Icons.question_answer_outlined, color: Color(0xFF2CB4B6)),
-              title: Text("FAQ's", style: GoogleFonts.poppins()),
-              onTap: widget.onFAQ, // Navigate to FAQ page
+                leading: Icon(
+                    Icons.question_answer_outlined, color: Color(0xFF2CB4B6)),
+                title: Text("FAQ's", style: GoogleFonts.poppins()),
+                onTap: widget.onFAQ, // Navigate to FAQ page
               ),
             if (me?.role != 'Staff')
 
               ListTile(
-              leading: Icon(Icons.help_outline, color: Color(0xFF2CB4B6)),
-              title: Text('Help & Support', style: GoogleFonts.poppins()),
-              onTap: widget.onContactSupport,
+                leading: Icon(Icons.help_outline, color: Color(0xFF2CB4B6)),
+                title: Text('Help & Support', style: GoogleFonts.poppins()),
+                onTap: widget.onContactSupport,
               ),
 
 
@@ -300,7 +315,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
             // Legal
             if (me?.role != 'Staff')
-              Text('Legal', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text('Legal', style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             if (me?.role != 'Staff')
               ListTile(
@@ -334,12 +350,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: _confirmAndSignOut,  // ← call our new helper
+                  onPressed: _confirmAndSignOut, // ← call our new helper
                 ),
 
                 SizedBox(width: 15),
@@ -349,7 +366,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       side: const BorderSide(color: Colors.redAccent, width: 2),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -379,52 +397,54 @@ class _SettingsPageState extends State<SettingsPage> {
     final shouldSignOut = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          'Sign Out?',
-          style: GoogleFonts.poppins(
-              fontSize: 20, fontWeight: FontWeight.w600
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to sign out? You’ll need to log in again to continue.',
-          style: GoogleFonts.poppins(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancel',
+      builder: (ctx) =>
+          AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Sign Out?',
               style: GoogleFonts.poppins(
-                color: Colors.black,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                letterSpacing: 0.5,
+                  fontSize: 20, fontWeight: FontWeight.w600
               ),
             ),
-          ),
+            content: Text(
+              'Are you sure you want to sign out? You’ll need to log in again to continue.',
+              style: GoogleFonts.poppins(fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.poppins(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
 
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Sign Out',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white, fontWeight: FontWeight.w600
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Sign Out',
-              style: GoogleFonts.poppins(
-                  color: Colors.white, fontWeight: FontWeight.w600
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
     ) ?? false;
 
     if (!shouldSignOut) return;
@@ -433,129 +453,125 @@ class _SettingsPageState extends State<SettingsPage> {
     await FirebaseAuth.instance.signOut();
     // Now, reload the page instead of navigating
     if (mounted) {
-      // Correct navigation using context.go()
-      context.go('/');
-    }}
+      // 🚀 Replacing context.go('/') with Navigator.pushAndRemoveUntil
+      // This is the cleanest way to navigate to the Sign In page
+      // and completely clear the navigation history behind it.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (
+              context) => SignInPage(), // Assuming SignInPage is the target of '/'
+        ),
+            (Route<dynamic> route) => false, // Clears the entire history
+      );
+    }
+  }
 
-
-  /// Your existing HTTP POST wrapped in a method:
   Future<void> _sendDeletionEmail() async {
-    // 1️⃣ Ask for confirmation first
+    final user = FirebaseAuth.instance.currentUser;
+    final initiator = user?.email; // REAL initiator
+    final serviceNameSnap = await FirebaseFirestore.instance
+        .collection("users-sp-boarding")
+        .doc(widget.serviceId)
+        .get();
+
+    final serviceName = serviceNameSnap.data()?["shop_name"] ?? "Your Service";
+
+    if (initiator == null || ownerEmail == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(
+            "Unable to send email. Missing user or owner email.")),
+      );
+      return;
+    }
+
+    // Ask confirmation
     final shouldSend = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          'Are you sure?',
-          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'This will send you a confirmation email to finalize suspension. Continue?',
-          style: GoogleFonts.poppins(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+      builder: (ctx) =>
+          AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: Text("Are you sure?",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            content: Text(
+              "We will send a confirmation link to the owner's email to finalize the suspension of '$serviceName'.",
+              style: GoogleFonts.poppins(),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: Text("Cancel")),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent),
+                child: Text("Send", style: TextStyle(color: Colors.white)),
               ),
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(
-                  color: Colors.white, fontWeight: FontWeight.w600),
-            ),
+            ],
           ),
-        ],
-      ),
     ) ?? false;
 
     if (!shouldSend) return;
 
-    // 2️⃣ Show loading overlay
+    // Loader
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black26,
-                blurRadius: 8,
-                offset: Offset(0, 2),
+      builder: (_) =>
+          Center(
+            child: Container(
+              padding: EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFF2CB4B6)),
+                  SizedBox(height: 16),
+                  Text("Sending confirmation email...",
+                      style: GoogleFonts.poppins()),
+                ],
+              ),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(
-                strokeWidth: 3,
-                color: Color(0xFF2CB4B6),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Sending confirmation email...',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
 
-    // 3️⃣ Perform the HTTP request
+    // API CALL
     final url = Uri.parse(
-        'https://us-central1-petproject-test-g.cloudfunctions.net/sendDeletionEmail');
+        "https://us-central1-petproject-test-g.cloudfunctions.net/sendDeletionEmail");
 
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'serviceId': widget.serviceId,
-          'initiatorEmail': ownerEmail,
+          "serviceId": widget.serviceId,
+          "serviceName": serviceName, // 🔥 NEW
+          "initiatorEmail": initiator, // 🔥 correct initiator
+          "ownerEmail": ownerEmail, // 🔥 send email to owner
         }),
       );
 
-      // 4️⃣ Close loader before showing snackbar
-      Navigator.of(context, rootNavigator: true).pop();
-
-      final msg = response.statusCode == 200
-          ? 'Confirmation email sent.'
-          : 'Error ${response.statusCode}: ${response.body}';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg, style: GoogleFonts.poppins())),
-      );
-    } catch (e) {
-      // 4️⃣ Close loader before showing snackbar
       Navigator.of(context, rootNavigator: true).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text('Failed to send email: $e', style: GoogleFonts.poppins()),
+          content: Text(
+            response.statusCode == 200
+                ? "Confirmation email sent to owner."
+                : "Error ${response.statusCode}: ${response.body}",
+            style: GoogleFonts.poppins(),
+          ),
         ),
+      );
+    } catch (e) {
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Failed to send: $e", style: GoogleFonts.poppins())),
       );
     }
   }
-
 }

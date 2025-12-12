@@ -13,7 +13,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../Colors/AppColor.dart';
 import '../../Colors/AppColor.dart' as AppColor;
 import '../../shared/highlight_mode.dart';
-import '../HomePage/mainhomescreen.dart';
 import 'boarding_requests.dart';
 import 'chat_support/ChatScreen.dart';
 import 'chat_support/chat_support.dart';
@@ -1271,7 +1270,7 @@ class _OvernightPendingRequestsState extends State<OvernightPendingRequests>
                 _sectionHeader("WHAT THE USER PAID"),
                 _ledgerRow("Service Fee", serviceExcGst),
                 if (gstRegistered)
-                  _ledgerRow("GST on Service ${pct(serviceExcGst, gstOnService)}", gstOnService),
+                  _ledgerRow("GST on Service Fee ${pct(serviceExcGst, gstOnService)}", gstOnService),
 
                 if (checkoutEnabled) ...[
                   _ledgerRow("Platform Fee (charged to user)", platformExcGst),

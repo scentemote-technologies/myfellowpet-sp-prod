@@ -1,13 +1,18 @@
 // lib/screens/profile_selection_screen.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 // Assuming AppUser and UserNotifier are correctly defined in this imported file
 // NOTE: Ensure your AppUser class has the 'serviceType' property.
+import '../../providers/boarding_details_loader.dart';
+import '../Boarding/boarding_type.dart';
+import '../Boarding/partner_shell.dart';
 import '../Boarding/roles/role_service.dart';
+import '../Pet_Store/PetStorePartnerShell.dart';
+import '../Pet_Store/pet_store_details_loader.dart';
 
 const Color primaryColor = Color(0xFF2CB4B6);
 const Color accentColor = Color(0xFFF67B0D);
@@ -151,15 +156,42 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
           print("🔄 State updated.");
 
           if (mounted) {
-            // 🚀 Check the profile type or Firestore collection name
+            final serviceId = profile.serviceId;
+
+            // 🚀 REPLACING context.go() calls with Navigator.pushAndRemoveUntil
+
+            // --- 1. Pet Store Profile Navigation ---
             if (profile.serviceType.contains('Store')) {
-              // If it's a Pet Store, go to the Pet Profile route
-              context.go('/partner/pet-store/${profile.serviceId}/profile');
-              print("🧡 Navigated to Pet Store Profile: /partner/pet-store/${profile.serviceId}/profile");
+
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => PetStorePartnerShell(
+                    serviceId: serviceId,
+                    // Assuming Pet Store also uses a similar enum/structure for its dashboard
+                    currentPage: PartnerPage.profile,
+                    // Assuming PetStoreDetailsLoader is the widget for the Pet Store Profile
+                    child: PetStoreDetailsLoader(serviceId: serviceId),
+                  ),
+                ),
+                    (Route<dynamic> route) => false,
+              );
+              print("🧡 Navigated to Pet Store Profile: /partner/pet-store/$serviceId/profile (Widget Nav)");
+
+              // --- 2. Standard (Boarding) Profile Navigation ---
             } else {
-              // Otherwise, go to the standard partner profile route
-              context.go('/partner/${profile.serviceId}/profile');
-              print("💚 Navigated to Boarding Profile: /partner/${profile.serviceId}/profile");
+
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => PartnerShell(
+                    serviceId: serviceId,
+                    currentPage: PartnerPage.profile,
+                    // Assuming BoardingDetailsLoader is the widget for the Boarding Profile
+                    child: BoardingDetailsLoader(serviceId: serviceId),
+                  ),
+                ),
+                    (Route<dynamic> route) => false,
+              );
+              print("💚 Navigated to Boarding Profile: /partner/$serviceId/profile (Widget Nav)");
             }
           } else {
             print("❌ Widget not mounted. Navigation cancelled.");
@@ -240,7 +272,20 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
         side: BorderSide(color: Colors.grey[300]!, width: 1.5),
       ),
       child: InkWell(
-        onTap: () => context.go('/business-type'),
+        onTap: () {
+          // 🚀 Replacing context.go('/business-type')
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => RunTypeSelectionPage(
+                // Assuming this page requires user/auth details
+                uid: FirebaseAuth.instance.currentUser!.uid,
+                phone: FirebaseAuth.instance.currentUser!.phoneNumber ?? '',
+                email: FirebaseAuth.instance.currentUser!.email ?? '',
+                serviceId: null, // Indicates a new service/branch is being created
+              ),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(16),
         hoverColor: accentColor.withOpacity(0.05),
         child: Padding(

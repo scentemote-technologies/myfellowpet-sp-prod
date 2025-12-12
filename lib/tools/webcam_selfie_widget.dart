@@ -64,14 +64,18 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
         'audio': false,
       });
 
-      if (mounted) {
-        setState(() {
-          _stream = mediaStream;
-          _videoElement.srcObject = mediaStream;
+      _videoElement.srcObject = mediaStream;
+
+      _videoElement.onLoadedMetadata.listen((_) {
+        if (mounted) setState(() {
           _isCameraInitializing = false;
-          _error = '';
         });
-      }
+      });
+
+      setState(() {
+        _stream = mediaStream;
+        _error = '';
+      });
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -83,10 +87,37 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
   }
 
   Future<void> _stopCamera() async {
-    _stream?.getTracks().forEach((track) => track.stop());
-    _videoElement.srcObject = null;
-    _stream = null;
+    try {
+      if (_stream != null) {
+        // JS interop call — SAFE, no type casting
+        final jsTracks = (_stream as dynamic).getTracks();
+
+        // Convert JSArray to Dart list manually
+        for (var i = 0; i < jsTracks.length; i++) {
+          try {
+            jsTracks[i].stop();
+          } catch (err) {
+            print("Track stop error: $err");
+          }
+        }
+      }
+
+      // Clear the srcObject
+      _videoElement.srcObject = null;
+      _stream = null;
+
+      // Remove video element from DOM to ensure hard stop
+      if (_videoElement.parentNode != null) {
+        _videoElement.remove();
+      }
+
+    } catch (e) {
+      print("STOP CAMERA FINAL ERROR: $e");
+    }
   }
+
+
+
 
   @override
   void dispose() {
@@ -95,26 +126,44 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
   }
 
   Future<void> _captureImage() async {
-    if (_stream == null || _videoElement.videoWidth == 0) return;
+    if (_stream == null || _videoElement.videoWidth == 0) {
+      // WAIT 100ms AND TRY AGAIN (sometimes video metadata not ready)
+      await Future.delayed(const Duration(milliseconds: 120));
+
+      if (_videoElement.videoWidth == 0) {
+        print("⚠️ Video not ready, cannot capture.");
+        return;
+      }
+    }
 
     final canvas = html.CanvasElement(
       width: _videoElement.videoWidth,
       height: _videoElement.videoHeight,
     );
-    canvas.context2D.drawImage(_videoElement, 0, 0);
+
+    // DRAW SAFELY
+    final ctx = canvas.context2D;
+    try {
+      ctx.drawImage(_videoElement, 0, 0);
+    } catch (e) {
+      print("⚠️ drawImage failed: $e");
+      return;
+    }
 
     final blob = await canvas.toBlob('image/jpeg', 0.9);
     final reader = html.FileReader();
     reader.readAsArrayBuffer(blob);
     await reader.onLoadEnd.first;
 
-    if (mounted) {
-      await _stopCamera();
-      setState(() {
-        _capturedImageBytes = reader.result as Uint8List?;
-      });
-    }
+    if (!mounted) return;
+
+    await _stopCamera(); // <-- IMPORTANT
+
+    setState(() {
+      _capturedImageBytes = reader.result as Uint8List?;
+    });
   }
+
 
   void _retake() {
     setState(() {
@@ -125,18 +174,24 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
     _initializeCamera();
   }
 
-  void _accept() {
-    if (_capturedImageBytes != null) {
-      Navigator.of(context).pop(_capturedImageBytes);
-    }
+  void _accept() async {
+    await _stopCamera();     // <— stop camera before closing popup
+    Navigator.of(context).pop(_capturedImageBytes);
   }
+
 
   @override
   Widget build(BuildContext context) {
     // Responsive check for button layout
     final isMobile = MediaQuery.of(context).size.width < 500;
 
-    return Dialog(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) async {
+        // 🔥 ALWAYS stop camera no matter how the dialog is closed
+        await _stopCamera();
+      },
+      child: Dialog(
       elevation: 0,
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16.0), // Padding for mobile
@@ -193,7 +248,7 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
           ],
         ),
       ),
-    );
+    ),);
   }
 
   Widget _buildContentView() {
@@ -268,9 +323,13 @@ class _WebcamSelfieWidgetState extends State<WebcamSelfieWidget> {
     final List<Widget> buttons = [
       _customButton(
         text: "Cancel",
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () async {
+          await _stopCamera();     // <— stop camera first
+          Navigator.of(context).pop();
+        },
         isPrimary: false,
       ),
+
       _customButton(
         text: "Capture",
         icon: Icons.camera_alt,

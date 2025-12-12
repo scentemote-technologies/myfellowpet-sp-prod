@@ -7,12 +7,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_strategy/url_strategy.dart';
 
-import '../main.dart';
-import '../routes/routes.dart';
+import '../main.dart'; // Contains navigatorKey
 import '../providers/boarding_details_loader.dart';
 import '../models/General_user.dart';
 import '../screens/Boarding/preloaders/BoardingCardsForBoardingHomePage.dart';
@@ -23,6 +21,11 @@ import '../screens/Boarding/preloaders/favorites_provider.dart';
 import '../screens/Boarding/preloaders/header_media_provider.dart';
 import '../screens/Boarding/preloaders/hidden_services_provider.dart';
 import '../screens/Boarding/roles/role_service.dart';
+import '../screens/Boarding/service_requests_page.dart';
+import '../screens/Boarding/partner_shell.dart';
+import '../screens/Partner/email_signin.dart'; // REQUIRED: SignInPage
+import '../screens/Boarding/boarding_type.dart'; // REQUIRED: RunTypeSelectionPage
+import '../screens/Partner/profile_selection_screen.dart'; // REQUIRED: ProfileSelectionScreen
 
 class AppInitializer extends StatefulWidget {
   const AppInitializer({super.key});
@@ -34,7 +37,8 @@ class AppInitializer extends StatefulWidget {
 class _AppInitializerState extends State<AppInitializer> {
   late final Future<void> _initializationFuture;
 
-  static GoRouter? _router;
+  // REMOVED GoRouter reference
+  // Object? _routerConfig;
 
   @override
   void initState() {
@@ -58,7 +62,10 @@ class _AppInitializerState extends State<AppInitializer> {
     );
 
     if (kIsWeb) {
-      registerRecaptchaView();
+      // Assuming registerRecaptchaView is a globally accessible function
+      // and you have a placeholder for its implementation outside this file.
+      // registerRecaptchaView();
+
       const recaptchaV3SiteKey = String.fromEnvironment('RECAPTCHA_SITE_KEY');
 
       await FirebaseAppCheck.instance.activate(
@@ -96,9 +103,22 @@ class _AppInitializerState extends State<AppInitializer> {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      if (message.data.containsKey('serviceId')) {
-        final serviceId = message.data['serviceId'];
-        navigatorKey.currentContext?.go('/partner/$serviceId/overnight-requests');
+      final context = navigatorKey.currentContext;
+
+      if (message.data.containsKey('serviceId') && context != null) {
+        final serviceId = message.data['serviceId']!;
+
+        // 🚀 REPLACED context.go() with standard Navigator
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (ctx) => PartnerShell(
+              serviceId: serviceId,
+              currentPage: PartnerPage.overnightRequests,
+              child: ServiceRequestsPage(serviceId: serviceId),
+            ),
+          ),
+              (Route<dynamic> route) => false,
+        );
       }
     });
   }
@@ -142,56 +162,7 @@ class _AppInitializerState extends State<AppInitializer> {
             ChangeNotifierProvider(create: (ctx) => BoardingCardsProvider(ctx)),
             ChangeNotifierProvider(create: (_) => GeneralUserNotifier()),
           ],
-          child: Consumer<UserNotifier>(
-            builder: (context, userNotifier, child) {
-
-              // 1️⃣ Wait for auth
-              if (userNotifier.authState == AuthState.loading ||
-                  userNotifier.authState == AuthState.initializing) {
-                return const MaterialApp(
-                  debugShowCheckedModeBanner: false,
-                  home: Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                );
-              }
-
-              // 2️⃣ Router must be created ONLY ONCE
-              if (_router == null) {
-
-                // 🔥 Allow browser one frame to apply the correct URL before reading it
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_router != null) return; // prevent double create
-
-                  final initialUrl = kIsWeb
-                      ? "${html.window.location.pathname}${html.window.location.search}"
-                      : "/partner-with-us";
-
-                  print("🚀 Creating router with initialLocation = $initialUrl");
-
-                  setState(() {
-                    _router = createRouter(
-                      userNotifier,
-                      navigatorKey,
-                      initialLocation: initialUrl,
-                    );
-                  });
-                });
-
-                // While router is being constructed, show temporary blank screen
-                return const MaterialApp(
-                  debugShowCheckedModeBanner: false,
-                  home: Scaffold(
-                    backgroundColor: Color(0xFFF0F8F8),
-                  ),
-                );
-              }
-
-              // 3️⃣ Router READY → return the actual app
-              return MyApp(router: _router!);
-            },
-          ),
-
+          child: const MyAppRoot(), // Go directly to MyAppRoot
         );
       },
     );
@@ -199,17 +170,56 @@ class _AppInitializerState extends State<AppInitializer> {
 }
 
 
-class MyApp extends StatelessWidget {
-  final GoRouter router;
-  const MyApp({super.key, required this.router});
+// --- RENAMED & RE-PURPOSED MYAPP CLASS ---
+class MyAppRoot extends StatelessWidget {
+  const MyAppRoot({super.key});
+
+  // Helper method to determine the initial widget after auth is resolved
+  Widget _getInitialWidget(UserNotifier userNotifier) {
+    final authState = userNotifier.authState;
+    final isLoggedIn = authState == AuthState.authenticated ||
+        authState == AuthState.onboardingNeeded ||
+        authState == AuthState.profileSelectionNeeded;
+
+    // Logic based on the old router redirects:
+
+    // 1. If not logged in, go to Sign In
+    if (!isLoggedIn) {
+      return SignInPage();
+    }
+
+    // 2. If logged in, check auth state for specific pages
+    if (authState == AuthState.onboardingNeeded) {
+      // '/business-type' route
+      return RunTypeSelectionPage(
+        uid: FirebaseAuth.instance.currentUser!.uid,
+        phone: FirebaseAuth.instance.currentUser!.phoneNumber ?? '',
+        email: FirebaseAuth.instance.currentUser!.email ?? '',
+        serviceId: null,
+      );
+    }
+
+    if (authState == AuthState.profileSelectionNeeded || authState == AuthState.authenticated) {
+      // '/profile-selection' route (used as the default target when logged in)
+      return const ProfileSelectionScreen();
+    }
+
+    // Fallback: Should not be reached, but default to Sign In
+    return SignInPage();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      routerConfig: router,
+    // Watch the UserNotifier to trigger a rebuild when the auth state changes
+    final userNotifier = context.watch<UserNotifier>();
+
+    return MaterialApp(
+      navigatorKey: navigatorKey, // Keep the global key for navigation
       debugShowCheckedModeBanner: false,
       title: 'MyFellowPet',
+      // Define the home widget based on the current AuthState
+      home: _getInitialWidget(userNotifier),
     );
   }
 }
-
+// -------------------------------------------------

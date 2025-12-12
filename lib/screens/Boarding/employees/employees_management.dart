@@ -7,11 +7,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 // Assuming these imports are correctly pointing to your files
+import '../../../EmployeeComingSoon.dart';
+import '../partner_shell.dart';
 import '../roles/role_service.dart';
 import 'employee_tasks.dart'; // Uncomment if TasksPage is needed and defined here
 
@@ -128,134 +129,169 @@ class _EmployeePageState extends State<EmployeePage> {
   }
 
 
+
   void _openAddEmployeeForm(int currentCount) {
-    context.go(
-      '/partner/${widget.serviceId}/employees/add-emp',
-      extra: {
-        'employeeCount': currentCount,
-        'employeeLimit': employeeLimit,
-        'onAdded': () => setState(() {}),
-      },
-    );
+  Navigator.of(context).push(
+  MaterialPageRoute(
+  builder: (context) => AddEmployeePage(
+    serviceId: widget.serviceId,
+    employeeCount: currentCount,
+    employeeLimit: employeeLimit,
+    onAdded:  () => setState(() {}),
+  ), // Use 'const' if possible
+  ),
+  );
   }
 
   @override
   Widget build(BuildContext context) {
     final me = context.watch<UserNotifier>().me;
 
-    // Determine which roles to show in tabs based on the current user's role
-    final List<String> visibleRoles = (me?.role == 'Owner')
-        ? ['Owner', 'Manager', 'Staff']
-        : (me?.role == 'Manager')
-        ? ['Manager', 'Staff']
-        : ['Staff'];
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("settings")
+          .doc("employees")
+          .snapshots(),
+      builder: (context, settingSnap) {
+        if (settingSnap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: primaryColor)),
+          );
+        }
 
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: Text('Employees', style: GoogleFonts.poppins()),
-          backgroundColor: Colors.white,
-          elevation: 0,
-        ),
-        body: const Center(child: CircularProgressIndicator(color: primaryColor)),
-      );
-    }
+        final settingData = settingSnap.data?.data() as Map<String, dynamic>?;
 
-    return DefaultTabController(
-      length: visibleRoles.length,
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          scrolledUnderElevation: 0.5,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          title: Text(
-            'Employees',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
+        final bool isAllowed =
+            settingData?["home_boarder_web_sp"] == true;
+
+        // ❌ If false → show Coming Soon instead of Employee Page
+        if (!isAllowed) {
+          return const EmployeeComingSoon(); // <-- your coming soon page
+        }
+
+        // ❇️ If allowed → continue showing normal employee UI below
+        final List<String> visibleRoles = (me?.role == 'Owner')
+            ? ['Owner', 'Manager', 'Staff']
+            : (me?.role == 'Manager')
+            ? ['Manager', 'Staff']
+            : ['Staff'];
+
+        if (_isLoading) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              title: Text('Employees', style: GoogleFonts.poppins()),
+              backgroundColor: Colors.white,
+              elevation: 0,
             ),
-          ),
-          actions: [
-            if (me?.role != 'Staff')
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: _styledButton(
-                  'Ex-Employees',
-                  Icons.edit_outlined,
-                  primaryColor,
-                      () => _showFormerEmployeesDialog(), // 👈 this is the 4th arg
+            body: const Center(child: CircularProgressIndicator(color: primaryColor)),
+          );
+        }
+
+        return DefaultTabController(
+          length: visibleRoles.length,
+          child: Scaffold(
+            backgroundColor: Colors.grey.shade50,
+            appBar: AppBar(
+              scrolledUnderElevation: 0.5,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              title: Text(
+                'Employees',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
-
               ),
-          ],
-
-          bottom: TabBar(
-            indicator: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              actions: [
+                if (me?.role != 'Staff')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: _styledButton(
+                      'Ex-Employees',
+                      Icons.edit_outlined,
+                      primaryColor,
+                          () => _showFormerEmployeesDialog(),
+                    ),
+                  ),
+              ],
+              bottom: TabBar(
+                indicator: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                indicatorPadding: const EdgeInsets.symmetric(horizontal: 8),
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: primaryColor,
+                unselectedLabelColor: Colors.grey.shade600,
+                labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                unselectedLabelStyle: GoogleFonts.poppins(),
+                tabs: visibleRoles.map((r) => Tab(text: r)).toList(),
+              ),
             ),
-            indicatorPadding: const EdgeInsets.symmetric(horizontal: 8),
-            indicatorSize: TabBarIndicatorSize.tab,
-            labelColor: primaryColor,
-            unselectedLabelColor: Colors.grey.shade600,
-            labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            unselectedLabelStyle: GoogleFonts.poppins(),
-            tabs: visibleRoles.map((r) => Tab(text: r)).toList(),
-          ),
-        ),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users-sp-boarding')
-              .doc(widget.serviceId)
-              .collection('employees')
-              .snapshots(),
-          builder: (ctx, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: primaryColor));
-            }
-            if (!snap.hasData || snap.data!.docs.isEmpty) {
-              return _buildEmptyState('No Employees Found', 'Add your first employee to get started.');
-            }
-            final docs = snap.data!.docs;
 
-            return TabBarView(
-              children: visibleRoles.map((role) {
-                final roleDocs = docs.where((d) {
-                  final data = d.data()! as Map<String, dynamic>;
-                  return data['role'] == role;
-                }).toList();
-
-                if (roleDocs.isEmpty) {
+            body: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users-sp-boarding')
+                  .doc(widget.serviceId)
+                  .collection('employees')
+                  .snapshots(),
+              builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator(color: primaryColor));
+                }
+                if (!snap.hasData || snap.data!.docs.isEmpty) {
                   return _buildEmptyState(
-                    'No $role Found',
-                    'There are currently no employees assigned to this role.',
-                  );
+                      'No Employees Found',
+                      'Add your first employee to get started.');
                 }
 
-                return LayoutBuilder(builder: (ctx, constraints) {
-                  final crossCount = (constraints.maxWidth / 350).floor().clamp(1, 4);
-                  return staggered.MasonryGridView.count(
-                    padding: const EdgeInsets.all(16),
-                    crossAxisCount: crossCount,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    itemCount: roleDocs.length,
-                    itemBuilder: (ctx, i) => _buildEmployeeCard(roleDocs[i])
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: (i * 50).ms)
-                        .slideY(begin: 0.2, end: 0),
-                  );
-                });
-              }).toList(),
-            );
-          },
-        ),
-        floatingActionButton: me?.role == 'Owner' ? _buildFloatingActionButton() : null,
-      ),
+                final docs = snap.data!.docs;
+
+                return TabBarView(
+                  children: visibleRoles.map((role) {
+                    final roleDocs = docs.where((d) {
+                      final data = d.data()! as Map<String, dynamic>;
+                      return data['role'] == role;
+                    }).toList();
+
+                    if (roleDocs.isEmpty) {
+                      return _buildEmptyState(
+                        'No $role Found',
+                        'There are currently no employees assigned to this role.',
+                      );
+                    }
+
+                    return LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        final crossCount =
+                        (constraints.maxWidth / 350).floor().clamp(1, 4);
+                        return staggered.MasonryGridView.count(
+                          padding: const EdgeInsets.all(16),
+                          crossAxisCount: crossCount,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          itemCount: roleDocs.length,
+                          itemBuilder: (ctx, i) => _buildEmployeeCard(roleDocs[i])
+                              .animate()
+                              .fadeIn(duration: 400.ms, delay: (i * 50).ms)
+                              .slideY(begin: 0.2, end: 0),
+                        );
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            floatingActionButton:
+            me?.role == 'Owner' ? _buildFloatingActionButton() : null,
+          ),
+        );
+      },
     );
   }
+
 
   Widget _buildFloatingActionButton() {
     return Builder(
@@ -464,9 +500,24 @@ class _EmployeePageState extends State<EmployeePage> {
                 if (!isFormerEmployee) ...[
                   // Show "Tasks" button ONLY if they are active
                   if (isActive)
+
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => context.go('/partner/${widget.serviceId}/employees/$employeeId/tasks'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => PartnerShell(
+                                serviceId: widget.serviceId,
+                                // Use 'PartnerPage.other' or a dedicated enum for nested routes
+                                currentPage: PartnerPage.other,
+                                child: TasksScreen(
+                                    serviceId: widget.serviceId,
+                                    employeeId: employeeId
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.task, size: 18, color: primaryColor),
                         label: const Text('Tasks'),
                         style: _actionButtonStyle(),
@@ -758,6 +809,11 @@ class AddEmployeePage extends StatefulWidget {
 
 class _AddEmployeePageState extends State<AddEmployeePage> {
 
+  bool isSendingOtp = false;
+  bool isVerifyingOtp = false;
+  bool isPhoneVerified = false;
+
+
   String? _emailError;
 
   final Map<String, dynamic> form = {};
@@ -774,6 +830,48 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     'Staff': 'Can view and update bookings, chat with customers, mark pet status.',
   };
 
+  Future<String> _getSmsFunctionName() async {
+    final settingsSnap = await FirebaseFirestore.instance
+        .collection("settings")
+        .doc("employees")
+        .get();
+
+    final data = settingsSnap.data() ?? {};
+
+    final bool live = data["number_verification"] == true;
+
+    return live ? "sendSms" : "sendTestSms";
+  }
+
+  Future<void> _sendOtp() async {
+    if (form["phone"] == null || form["phone"].toString().length < 13) {
+      _showAppDialog(context, message: "Enter a valid number first.");
+      return;
+    }
+
+    setState(() => isSendingOtp = true);
+
+    try {
+      final functionName = await _getSmsFunctionName();
+      final callable = FirebaseFunctions.instance.httpsCallable(functionName);
+
+      await callable.call({
+        "phoneNumber": form["phone"],
+        "docId": widget.serviceId,
+        "verificationType": "sms",
+      });
+
+      _showAppDialog(
+        context,
+        title: "OTP Sent",
+        message: "A verification code has been sent to ${form["phone"]}.",
+        icon: Icons.sms,
+        iconColor: primaryColor,
+      );
+    } finally {
+      setState(() => isSendingOtp = false);
+    }
+  }
 
   Future<void> _pickAndUploadFile(String type) async {
     // 1. Set the correct loading state based on the button pressed
@@ -974,6 +1072,11 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
         'photoUrl': form['photoUrl'],
         'idProofUrl': form['idProofUrl'],
       };
+      print("🔥 FINAL PAYLOAD SENT TO FUNCTION:");
+      payload.forEach((k, v) => print("  $k → $v"));
+      print("🔥 photoUrl bytes exist? ${previewImage != null}");
+      print("🔥 idProofUrl exists? ${form['idProofUrl'] != null}");
+
 
       final callable = FirebaseFunctions.instance.httpsCallable('createBoardingEmployee');
       final resp = await callable.call(payload);
@@ -1191,13 +1294,113 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                     ),
                     const SizedBox(height: 16),
 
-                    TextField(
-                      decoration: fieldDecoration('Phone Number',
-                          helper: 'Prefix +91 added automatically'),
-                      maxLength: 10,
-                      keyboardType: TextInputType.phone,
-                      onChanged: (v) => form['phone'] = '+91$v',
+                    // PHONE NUMBER FIELD + VERIFIED STATE
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            decoration: fieldDecoration('Phone Number',
+                                helper: 'Prefix +91 added automatically'),
+                            maxLength: 10,
+                            keyboardType: TextInputType.phone,
+                            onChanged: (v) {
+                              form['phone'] = '+91$v';
+                              if (isPhoneVerified) {
+                                setState(() => isPhoneVerified = false); // reset if modifying
+                              }
+                            },
+                            enabled: !isPhoneVerified, // disable after verification
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        // VERIFIED ICON
+                        if (isPhoneVerified)
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check, color: Colors.white, size: 18),
+                          ),
+                      ],
                     ),
+
+                    const SizedBox(height: 10),
+
+// SHOW SEND + VERIFY ONLY IF NOT VERIFIED
+                    // SHOW SEND + VERIFY ONLY IF NOT VERIFIED
+                    if (!isPhoneVerified) ...[
+                      // SEND OTP BUTTON
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isSendingOtp ? null : _sendOtp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                          ),
+                          child: isSendingOtp
+                              ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : Text("Send OTP", style: GoogleFonts.poppins(color: Colors.white)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // OTP FIELD
+                      TextField(
+                        decoration: fieldDecoration("OTP Code"),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) => form['otp'] = v,
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // VERIFY BUTTON
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isVerifyingOtp ? null : _verifyOtp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                          child: isVerifyingOtp
+                              ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : Text("Verify OTP", style: GoogleFonts.poppins(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+
+// CHANGE NUMBER BUTTON AFTER VERIFIED
+                    if (isPhoneVerified) ...[
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            isPhoneVerified = false;
+                            form['otp'] = '';
+                          });
+                        },
+                        child: Text("Change Number", style: GoogleFonts.poppins(color: primaryColor)),
+                      )
+                    ],
+
                     const SizedBox(height: 16),
                     TextField(
                       decoration: fieldDecoration('Email').copyWith(
@@ -1304,7 +1507,46 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
       ),
     );
   }
+  Future<void> _verifyOtp() async {
+    final otp = form["otp"];
+    if (otp == null || otp.isEmpty) {
+      _showAppDialog(context, message: "Enter the OTP first.");
+      return;
+    }
 
+    setState(() => isVerifyingOtp = true);
+
+    final settingsSnap = await FirebaseFirestore.instance
+        .collection("settings")
+        .doc("employees")
+        .get();
+
+    final data = settingsSnap.data() ?? {};
+    final bool live = data["number_verification"] == true;
+
+    final verifyFunction = live ? "verifySmsCode" : "verifyTestSmsCode";
+    final callable = FirebaseFunctions.instance.httpsCallable(verifyFunction);
+
+    try {
+      final result = await callable.call({
+        "code": otp,
+        "docId": widget.serviceId,
+      });
+
+      if (result.data["success"] == true) {
+        setState(() => isPhoneVerified = true);
+        _showAppDialog(
+          context,
+          title: "Success",
+          message: "Phone number verified!",
+          icon: Icons.check_circle_outline,
+          iconColor: Colors.green,
+        );
+      }
+    } finally {
+      setState(() => isVerifyingOtp = false);
+    }
+  }
 }
 class _ExpandableInfoRow extends StatefulWidget {
   final IconData icon;

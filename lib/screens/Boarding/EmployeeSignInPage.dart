@@ -3,11 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
 
-import '../../Colors/AppColor.dart'; // Import Google Sign-In
+import '../../Colors/AppColor.dart';
+import '../../providers/boarding_details_loader.dart'; // Import Google Sign-In
 
 
 class EmployeeSignInPage extends StatefulWidget {
@@ -68,7 +69,17 @@ class _EmployeeSignInPageState extends State<EmployeeSignInPage> {
 
       // 6. Navigate to the employee's dashboard.
       if (mounted) {
-        context.go('/partner/$serviceId/profile');
+        // 🚀 Replacing context.go('/partner/$serviceId/profile')
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => PartnerShell(
+              serviceId: serviceId, // Assuming 'serviceId' is available in the current scope
+              currentPage: PartnerPage.profile, // Use the specific enum for the Profile page
+              child: BoardingDetailsLoader(serviceId: serviceId), // The target widget for the profile view
+            ),
+          ),
+              (Route<dynamic> route) => false, // Clears the entire history below this route
+        );
       }
     } on FirebaseAuthException catch (e) {
       debugPrint('🔥 Firebase Auth Exception: ${e.message}');

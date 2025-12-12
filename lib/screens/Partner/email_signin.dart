@@ -5,12 +5,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show AuthCredential, FirebaseAuth, GoogleAuthProvider, User, UserCredential;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:myfellowpet_sp/screens/Partner/profile_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart'; // REQUIRED: For UserNotifier access
+import '../../providers/boarding_details_loader.dart';
 import '../Boarding/EmployeeSignInPage.dart';
+import '../Boarding/boarding_type.dart';
+import '../Boarding/partner_shell.dart';
 import 'partner_appbar.dart';
+
+// --- REQUIRED IMPORTS FOR NAVIGATION ---
+import '../Boarding/roles/role_service.dart'; // UserNotifier, AuthState
+// ----------------------------------------
 
 
 final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+const Color primaryColor = Color(0xFF2CB4B6); // Define the color
 
 class SignInPage extends StatefulWidget {
   @override
@@ -68,6 +79,77 @@ class _SignInPageState extends State<SignInPage> {
     super.dispose();
   }
 
+  // --- NEW REDIRECTOR LOGIC ---
+  void _redirectToAuthenticatedUser(BuildContext context, UserNotifier userNotifier) {
+
+    // Safety check: ensure user is logged in and state has been resolved
+    if (userNotifier.authState == AuthState.loading ||
+        userNotifier.authState == AuthState.initializing) {
+      // Should not happen, but safe to ignore if still loading
+      return;
+    }
+
+    final authState = userNotifier.authState;
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+
+    if (authState == AuthState.onboardingNeeded && currentUser != null) {
+      // Navigate to /business-type
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (ctx) => RunTypeSelectionPage(
+            uid: currentUser.uid,
+            phone: currentUser.phoneNumber ?? '',
+            email: currentUser.email ?? '',
+            serviceId: null,
+          ),
+        ),
+            (route) => false,
+      );
+      return;
+    }
+
+    if (authState == AuthState.profileSelectionNeeded) {
+      // Navigate to /profile-selection
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (ctx) => const ProfileSelectionScreen(),
+        ),
+            (route) => false,
+      );
+      return;
+    }
+
+    // If authenticated AND we have a serviceId, go directly to the profile
+    if (authState == AuthState.authenticated && userNotifier.me?.serviceId != null) {
+      final serviceId = userNotifier.me!.serviceId!;
+      // Navigate to /partner/:serviceId/profile
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (ctx) => PartnerShell(
+            serviceId: serviceId,
+            currentPage: PartnerPage.profile,
+            child: BoardingDetailsLoader(serviceId: serviceId),
+          ),
+        ),
+            (route) => false,
+      );
+      return;
+    }
+
+    // Fallback: If logged in but somehow missed the checks (e.g., waiting for profile data),
+    // redirect to the Profile Selection screen as the safe hub.
+    if (currentUser != null) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (ctx) => const ProfileSelectionScreen(),
+        ),
+            (route) => false,
+      );
+    }
+  }
+  // -----------------------------
+
+
   // In _SignInPageState
   Future<void> _signInWithGoogle() async {
     setState(() {
@@ -91,6 +173,20 @@ class _SignInPageState extends State<SignInPage> {
         // Sign in with Firebase
         await _auth.signInWithCredential(credential);
         print("✅ Google Sign-in successful. UserNotifier will now take over.");
+
+        // --- NEW: Force profile refresh and redirect ---
+        // Access the UserNotifier instance
+        if (mounted) {
+          final userNotifier = Provider.of<UserNotifier>(context, listen: false);
+
+          // Wait for the user profile to be fetched and auth state to be finalized
+          await userNotifier.refreshUserProfile();
+
+          if (mounted) {
+            _redirectToAuthenticatedUser(context, userNotifier);
+          }
+        }
+        // ----------------------------------------------
       }
     } catch (e) {
       print("🔥 Google Sign-in failed: $e");
@@ -117,7 +213,7 @@ class _SignInPageState extends State<SignInPage> {
   Widget _buildLoginCard() {
     return Container(
       width: 360,
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -134,12 +230,12 @@ class _SignInPageState extends State<SignInPage> {
                 .get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return SizedBox(
+                return const SizedBox(
                   height: 180,
                   child: Center(child: CircularProgressIndicator()),
                 );
               } else if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-                return SizedBox(
+                return const SizedBox(
                   height: 180,
                   child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
                 );
@@ -147,8 +243,9 @@ class _SignInPageState extends State<SignInPage> {
                 final imageUrl = snapshot.data!['main_image'];
                 return Container(
                   height: 200,
+                  // Assuming imageUrl is String
                   child: Image.network(
-                    imageUrl,
+                    imageUrl as String,
                     fit: BoxFit.contain,
                   ),
                 );
@@ -156,7 +253,7 @@ class _SignInPageState extends State<SignInPage> {
             },
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
@@ -164,7 +261,7 @@ class _SignInPageState extends State<SignInPage> {
                 fontSize: 14,
                 color: Colors.black87,
               ),
-              children: <TextSpan>[
+              children: const <TextSpan>[
                 TextSpan(text: 'Sign in to '),
                 TextSpan(
                   text: 'Login/Register',
@@ -173,23 +270,23 @@ class _SignInPageState extends State<SignInPage> {
               ],
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Google Sign-In button
           OutlinedButton(
             onPressed: _isLoading ? null : _signInWithGoogle,
             style: OutlinedButton.styleFrom(
-              minimumSize: Size(double.infinity, 48),
+              minimumSize: const Size(double.infinity, 48),
               backgroundColor: Colors.white,
               foregroundColor: Colors.black,
-              side: BorderSide(color: primaryColor, width: 2),
+              side: const BorderSide(color: primaryColor, width: 2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
               textStyle: GoogleFonts.poppins(fontSize: 16),
             ),
             child: _isLoading
-                ? SizedBox(
+                ? const SizedBox(
               height: 24,
               width: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
@@ -198,13 +295,13 @@ class _SignInPageState extends State<SignInPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset('assets/google_logo.png', height: 24.0),
-                SizedBox(width: 8.0),
-                Text('Sign in with Google'),
+                const SizedBox(width: 8.0),
+                const Text('Sign in with Google'),
               ],
             ),
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           if (_errorMessage.isNotEmpty)
             Text(
@@ -215,11 +312,11 @@ class _SignInPageState extends State<SignInPage> {
               ),
             ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
 
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
                 .collection('company_documents')
@@ -278,11 +375,11 @@ class _SignInPageState extends State<SignInPage> {
           .get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox();
+          return const SizedBox();
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return SizedBox();
+          return const SizedBox();
         }
 
         final data = snapshot.data!;
@@ -303,16 +400,16 @@ class _SignInPageState extends State<SignInPage> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 12,
                 children: [
-                  _buildFooterLink('Terms of Use', termsUrl),
-                  Text('|', style: TextStyle(color: Colors.grey)),
-                  _buildFooterLink('Privacy Policy', privacyUrl),
-                  Text('|', style: TextStyle(color: Colors.grey)),
-                  _buildFooterLink('Cancellation & Refund', cancelUrl),
+                  _buildFooterLink('Terms of Use', termsUrl as String),
+                  const Text('|', style: TextStyle(color: Colors.grey)),
+                  _buildFooterLink('Privacy Policy', privacyUrl as String),
+                  const Text('|', style: TextStyle(color: Colors.grey)),
+                  _buildFooterLink('Cancellation & Refund', cancelUrl as String),
                 ],
               ),
             ],
@@ -345,10 +442,11 @@ class _SignInPageState extends State<SignInPage> {
       backgroundColor: Colors.white,
       key: _scaffoldKey,
       appBar: PartnerAppbar(scaffoldKey: _scaffoldKey),
+      // Assuming buildMobileDrawer is defined in PartnerAppbar or accessible globally
       drawer: PartnerAppbar.buildMobileDrawer(context),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 50),
+          padding: const EdgeInsets.symmetric(vertical: 50),
           child: Center(
             child: Column(
               children: [

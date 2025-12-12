@@ -7,7 +7,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 
 import '../../Colors/AppColor.dart';
-import '../Partner/email_signin.dart';
+import '../Partner/email_signin.dart' hide primaryColor;
 
 
 
@@ -374,9 +374,10 @@ color: Colors.white,                shape: RoundedRectangleBorder(
                                   ),
                                 ),
                                 content: Text(
-                                  "You have already used your allowance of $_monthlyAllowance unavailable days for ${DateFormat.yMMMM().format(norm)}.",
+                                  "You have reached your monthly limit of $_monthlyAllowance unavailable days for ${DateFormat.yMMMM().format(norm)}. For further assistance, please visit the Support tab and select General Queries.",
                                   style: GoogleFonts.poppins(fontSize: 14),
                                 ),
+
                                 actions: [
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(

@@ -6,34 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart'; // Import Firebase Stor
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class WhatsAppSender {
-  final String accountSid = 'AC34b0df0f2784f2344405bbbafb374f10'; // Twilio Account SID
-  final String authToken = '61e17f9489362d59e045541642f45253'; // Twilio Auth Token
-  final String fromPhone = 'whatsapp:+14155238886'; // Twilio sandbox WhatsApp number
 
-  Future<void> sendWhatsAppMessage(String toPhone, String message) async {
-    final url = Uri.parse('https://api.twilio.com/2010-04-01/Accounts/$accountSid/Messages.json');
-    final credentials = '$accountSid:$authToken';
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Authorization': 'Basic ' + base64Encode(utf8.encode(credentials)),
-      },
-      body: {
-        'From': fromPhone,
-        'To': 'whatsapp:$toPhone',
-        'Body': message,
-      },
-    );
-
-    if (response.statusCode == 200) {
-      print('Message sent successfully!');
-    } else {
-      print('Failed to send message: ${response.statusCode} - ${response.body}');
-    }
-  }
-}
 
 class InternshipEnrollment extends StatefulWidget {
   final String courseName;
@@ -70,7 +43,6 @@ class _EnrollmentFormPageState extends State<InternshipEnrollment> {
   Uint8List? selected10thMarkscardBytes;
   Uint8List? selectedResumeBytes;
 
-  final WhatsAppSender _whatsAppSender = WhatsAppSender();
 
   double uploadProgress = 0.0;
 
@@ -326,10 +298,6 @@ class _EnrollmentFormPageState extends State<InternshipEnrollment> {
         });
 
         // Send WhatsApp Message
-        await _whatsAppSender.sendWhatsAppMessage(
-          formattedPhoneNumber,
-          "Hello $firstName, your enrollment for the course '${widget.courseName}' is successful. We will contact you soon!",
-        );
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Enrollment successful!')),

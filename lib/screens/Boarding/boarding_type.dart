@@ -26,129 +26,159 @@ class RunTypeSelectionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('partner_run_types')
-            .doc('Boarding')
-            .collection('types')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
 
-          final docs = snapshot.data!.docs;
+      body: Stack(
+        children: [
+          // --- 1. Main Content (Existing StreamBuilder) ---
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('partner_run_types')
+                .doc('Boarding')
+                .collection('types')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final List<_RunTypeOption> options = [
-            ...docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              return _RunTypeOption(
-                data['title'] ?? '',
-                data['subtitle'] ?? '',
-                _getIcon(data['icon'] ?? 'home'),
-                doc.id == 'home_boarding'
-                    ? Homeboarderonboardpage(
-                  uid: uid,
-                  phone: phone,
-                  email: email,
-                  runType: 'Home Run',
-                  serviceId: serviceId ?? '',
-                )
-                    : ComingSoonPage(title: data['title'] ?? ''),
-                isComingSoon: data['isComingSoon'] ?? true,
+              final docs = snapshot.data!.docs;
+
+              final List<_RunTypeOption> options = [
+                ...docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return _RunTypeOption(
+                    data['title'] ?? '',
+                    data['subtitle'] ?? '',
+                    _getIcon(data['icon'] ?? 'home'),
+                    doc.id == 'home_boarding'
+                        ? Homeboarderonboardpage(
+                      uid: uid,
+                      phone: phone,
+                      email: email,
+                      runType: 'Home Run',
+                      serviceId: serviceId ?? '',
+                    )
+                        : ComingSoonPage(title: data['title'] ?? ''),
+                    isComingSoon: data['isComingSoon'] ?? true,
+                  );
+                }).toList(),
+                // Pet Store tile
+                _RunTypeOption(
+                  'Pet Store',
+                  'Open your pet store with us',
+                  Icons.store_mall_directory_outlined,
+                  PetStoreOnboardingPage(
+                    uid: uid,
+                    phone: phone,
+                    email: email,
+                    serviceId: serviceId ?? '', runType: '',
+                  ),
+                  isComingSoon: false, // enabled
+                ),
+              ];
+
+              return Container(
+                // Your main content styling and structure
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      primaryColor.withOpacity(0.9),
+                      accentColor.withOpacity(0.7),
+                    ],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        child: Text(
+                          'Become a Partner',
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'How would you like to partner with us?',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Select the option that best describes your service.',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
+                              ),
+                              const SizedBox(height: 40),
+                              Wrap(
+                                spacing: 20,
+                                runSpacing: 20,
+                                alignment: WrapAlignment.center,
+                                children: options
+                                    .map((opt) => _OptionCard(option: opt))
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               );
-            }).toList(),
-            // Pet Store tile
-            _RunTypeOption(
-              'Pet Store',
-              'Open your pet store with us',
-              Icons.store_mall_directory_outlined,
-              PetStoreOnboardingPage(
-                uid: uid,
-                phone: phone,
-                email: email,
-                serviceId: serviceId ?? '', runType: '',
-              ),
-              isComingSoon: false, // enabled
-            ),
-          ];
-
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  primaryColor.withOpacity(0.9),
-                  accentColor.withOpacity(0.7),
-                ],
+            },
+          ),
+          // --- 2. Floating Back Arrow Button (Layered on top) ---
+          Positioned(
+            top: 30, // Adjust this value for vertical spacing (inside SafeArea)
+            left: 10, // Adjust this value for horizontal spacing
+            child: SafeArea(
+              child: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new, // A slightly better-looking back arrow
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                // Optional: Add a subtle background for better visibility
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withOpacity(0.2),
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(10),
+                ),
               ),
             ),
-            child: Column(
-              children: [
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                    child: Text(
-                      'Become a Partner',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'How would you like to partner with us?',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 2),
-                                )
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Select the option that best describes your service.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                          Wrap(
-                            spacing: 20,
-                            runSpacing: 20,
-                            alignment: WrapAlignment.center,
-                            children: options
-                                .map((opt) => _OptionCard(option: opt))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

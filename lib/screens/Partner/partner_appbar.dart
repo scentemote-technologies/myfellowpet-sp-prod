@@ -1,8 +1,9 @@
 // lib/widgets/PartnerAppbar.dart
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myfellowpet_sp/screens/Partner/email_signin.dart';
+import 'package:myfellowpet_sp/screens/Partner/partnerSpFaqs.dart';
 
 // --- Brand Colors ---
 const Color primaryColor = Color(0xFF2CB4B6);
@@ -72,7 +73,14 @@ class PartnerAppbar extends StatelessWidget implements PreferredSizeWidget {
 
           // 2. FAQ's Button
           ElevatedButton.icon(
-            onPressed: () => context.go('/partner-with-us/faqs'),
+            onPressed: () {
+              // 🚀 Replacing context.go('/partner-with-us/faqs')
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PartnerFaqPage(), // Assuming PartnerFaqPage is the target
+                ),
+              );
+            },
             icon: const Icon(Icons.quiz_outlined, size: 20, color: Colors.white,),
             label: const Text("FAQ's"),
             style: ElevatedButton.styleFrom(
@@ -148,14 +156,30 @@ class PartnerAppbar extends StatelessWidget implements PreferredSizeWidget {
             context,
             icon: Icons.quiz_outlined,
             text: "FAQ's",
-            onTap: () => context.go('/partner-with-us/faqs'),
+            onTap: () {
+              // 🚀 Replacing context.go('/partner-with-us/faqs')
+              // Use push to keep the current page (Sign In) in history, allowing a back button.
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const PartnerFaqPage(), // Assuming PartnerFaqPage is the target
+                ),
+              );
+            },
           ),
           const Divider(),
           _buildDrawerItem(
             context,
             icon: Icons.home_outlined,
             text: 'Home',
-            onTap: () => context.go('/'), // Adjust route as needed
+            onTap: () {
+              // 🚀 Replacing context.go('/')
+              // Use push to navigate to the main Home screen (MainHomeScreen).
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => SignInPage(), // Assuming MainHomeScreen is the target of '/'
+                ),
+              );
+            },
           ),
           // Add more navigation items here...
         ],

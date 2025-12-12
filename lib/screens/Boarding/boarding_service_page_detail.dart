@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
 import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
 import 'package:universal_html/html.dart' as html;
 
@@ -8,14 +10,17 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../Colors/AppColor.dart';
+import '../../Widgets/reusable_splash_screen.dart';
 import '../../helper.dart';
 import '../../user_app/screens/Boarding/boarding_servicedetailspage.dart';
+import '../Partner/email_signin.dart' hide primaryColor;
+import 'OtherBranchesPage.dart';
+import 'edit_service_info/edit_service_page.dart';
 
 // V V V PASTE THIS ENTIRE NEW CLASS AT THE BOTTOM OF YOUR FILE V V V
 
@@ -244,10 +249,6 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
   late Stream<DocumentSnapshot> _announcementsStream; // <-- ADD THIS LINE
   final Set<String> _dismissedAnnouncements = {};
   late Stream<DocumentSnapshot> _contractStream; // <-- ADD THIS
-
-
-
-
 
   @override
   void initState() {
@@ -1101,13 +1102,14 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
       builder: (BuildContext context) {
         final bool isApproved = widget.adminApproved;
         final Color statusColor = isApproved ? primaryColor : accentColor;
-        final IconData statusIcon = isApproved ? Icons.verified_user_outlined : Icons.hourglass_top_outlined;
 
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           backgroundColor: Colors.white,
           titlePadding: EdgeInsets.zero,
           contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+
+          // --- TITLE SECTION ---
           title: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -1119,21 +1121,41 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
             ),
             child: Row(
               children: [
-                Icon(statusIcon, color: statusColor, size: 28),
+                // Small LIVE dot
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor,
+                  ),
+                ),
                 const SizedBox(width: 12),
+
                 Text(
-                  isApproved ? 'Profile Verified' : 'Pending Review',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: statusColor),
+                  isApproved ? 'LIVE' : 'Pending Review',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
                 ),
               ],
             ),
           ),
+
+          // --- CONTENT SECTION ---
           content: Text(
             isApproved
                 ? 'Your profile has been verified by our team. It is now live and visible to pet parents on the app.'
                 : 'Your profile is currently under review by our team. It will not be visible to pet parents until it is approved. This usually takes 24-48 hours.',
-            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87, height: 1.5),
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.black87,
+              height: 1.5,
+            ),
           ),
+
+          // --- ACTION BUTTON ---
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -1141,7 +1163,13 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                 backgroundColor: statusColor,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+              child: Text(
+                'OK',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         );
@@ -1149,25 +1177,48 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
     );
   }
 
-  // --- UPDATED: Helper widget for the status indicator icon ---
+// --- UPDATED: Helper widget for the status indicator icon ---
   Widget _buildStatusIndicator(BuildContext context) {
     final bool isApproved = widget.adminApproved;
+
     return Tooltip(
-      message: isApproved ? 'Verified' : 'Pending Review',
+      message: isApproved ? 'Live' : 'Pending Review',
       child: InkWell(
         onTap: () => _showStatusInfoDialog(context),
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Icon(
-            isApproved ? Icons.verified_user : Icons.hourglass_top,
-            color: isApproved ? Colors.green : accentColor,
-            size: 28,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Dot
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isApproved ? Colors.green : accentColor,
+                ),
+              ),
+
+              const SizedBox(width: 6),
+
+              // Text
+              Text(
+                isApproved ? "LIVE" : "Pending",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isApproved ? Colors.green : accentColor,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
 
   Future<void> _updateOfferStatus(bool newValue) async {
     setState(() => _isOfferActive = newValue);
@@ -1267,7 +1318,7 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
               _showEditBankDetailsDialog();
             },
             icon: const Icon(Icons.edit, size: 18, color: Colors.white),
-            label: const Text('Edit Details'),
+            label: const Text('Edit Details', style: TextStyle(color: Colors.white),),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1546,34 +1597,47 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
   Widget _buildOfferSwitch({required bool isWide}) {
     return Row(
       children: [
-        // On mobile, show a descriptive icon instead of text
+        // Icon for mobile
         if (!isWide) ...[
           const Icon(Icons.sell_outlined, color: Colors.grey, size: 20),
           const SizedBox(width: 8),
         ],
-        // On wide screens, show the full text label
+
+        // Full text for wide screens
         if (isWide)
           Text(
             'Activate Offers',
             style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
           ),
+
         const SizedBox(width: 8),
-        // The Switch itself
+
+        /// --- CUSTOM SWITCH ---
         Transform.scale(
-          scale: 0.8, // Make the switch a bit smaller to fit better
+          scale: 0.8,
           child: Switch(
             value: _isOfferActive,
             onChanged: _isLoadingOfferStatus ? null : _updateOfferStatus,
-            activeColor: Colors.green,
-            activeTrackColor: Colors.green.withOpacity(0.3),
+
+            // Thumb (the circle)
+            activeThumbColor: Colors.white,
+            inactiveThumbColor: Colors.white,
+
+            // Track (background)
+            activeTrackColor: primaryColor,            // your purple
+            inactiveTrackColor: Colors.grey.shade400,  // soft grey
+
+            splashRadius: 20,
           ),
         ),
       ],
     );
   }
+
 
   Widget _buildHeader(BuildContext context) {
     final me = context.watch<UserNotifier>().me;
@@ -1642,18 +1706,50 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                   'Edit',
                   Icons.edit_outlined,
                   primaryColor,
-                      () => context.go('/partner/${widget.serviceId}/edit'),
+                      () {
+                    // 🚀 Replacing context.go() with Navigator.push()
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) {
+                          // Use the serviceId from the current widget
+                          final sid = widget.serviceId;
+
+                          // Recreate the target page structure
+                          return PartnerShell(
+                            serviceId: sid,
+                            // The currentLocation parameter is no longer needed
+                            // since we are not relying on URL paths/router state
+                            currentPage: PartnerPage.other,
+                            child: _BoardingEditPageLoader(serviceId: sid),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
 
               const SizedBox(width: 12),
 
               /// Branches button (only for Owner)
+              // Branches button (only for Owner)
               if (me?.role == 'Owner')
                 _styledButton(
                   'Branches',
                   Icons.store_outlined,
                   accentColor,
-                      () => context.go('/partner/${widget.serviceId}/branches'),
+                      () =>
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) =>   PartnerShell(
+                            serviceId: widget.serviceId,
+                            currentPage: PartnerPage.other, // <--- CORRECTED
+                            child: OtherBranchesPage(
+                              serviceId: widget.serviceId,
+                              ownerId: FirebaseAuth.instance.currentUser!.uid,
+                            ),
+                          ),
+                        ),
+                      ),
                 ),
               const SizedBox(width: 12),
               _buildStatusIndicator(context),
@@ -1700,7 +1796,9 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
 
               const SizedBox(width: 16),
 
-              /// Right: Actions menu
+              // The helper widgets (_BoardingEditPageLoader and OtherBranchesPage)
+// must be imported in this file for this code to work.
+
               PopupMenuButton<String>(
                 onSelected: (value) {
                   switch (value) {
@@ -1708,10 +1806,31 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                       _showPhonePreviewDialog(context);
                       break;
                     case 'edit':
-                      context.go('/partner/${widget.serviceId}/edit');
+                    // REPLACED context.go('/partner/${widget.serviceId}/edit')
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => PartnerShell(
+                            serviceId: widget.serviceId,
+                            currentPage: PartnerPage.other, // Not a main sidebar item
+                            child: _BoardingEditPageLoader(serviceId: widget.serviceId),
+                          ),
+                        ),
+                      );
                       break;
                     case 'branches':
-                      context.go('/partner/${widget.serviceId}/branches');
+                    // REPLACED context.go('/partner/${widget.serviceId}/branches')
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) => PartnerShell(
+                            serviceId: widget.serviceId,
+                            currentPage: PartnerPage.other, // Not a main sidebar item
+                            child: OtherBranchesPage(
+                              serviceId: widget.serviceId,
+                              ownerId: FirebaseAuth.instance.currentUser!.uid,
+                            ),
+                          ),
+                        ),
+                      );
                       break;
                     case 'reviews':
                       _showReviewsDialog(context);
@@ -1721,6 +1840,7 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                       break;
                   }
                 },
+// ... (rest of the code for itemBuilder remains the same)
                 itemBuilder: (BuildContext context) {
                   return <PopupMenuEntry<String>>[
                     if (me?.role == 'Owner' || me?.role == 'Manager')
@@ -1730,7 +1850,12 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                         child: StatefulBuilder(
                           builder: (BuildContext context, StateSetter setState) {
                             return SwitchListTile(
-                              title: Text('Activate Offers', style: GoogleFonts.poppins()),
+                              // ADD THESE ↓↓↓
+                              activeThumbColor: Colors.white,         // Thumb color
+                              activeTrackColor: primaryColor,    // YOUR custom color
+                              inactiveThumbColor: Colors.white,
+                              inactiveTrackColor: Colors.grey,
+                              title: Text('Activate Offers'),
                               value: _isOfferActive,
                               onChanged: (bool value) {
                                 _updateOfferStatus(value);
@@ -1744,16 +1869,23 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                     const PopupMenuDivider(),
                     // --- TWEAK: Added status item to the menu ---
                     PopupMenuItem<String>(
-                      value: 'status',
-                      child: ListTile(
-                        leading: Icon(
-                          widget.adminApproved ? Icons.verified_user_outlined : Icons.hourglass_top_outlined,
-                          color: widget.adminApproved ? Colors.green : Colors.orange,
-                        ),
-                        title: Text('Verification Status', style: GoogleFonts.poppins()),
-                      ),
-                    ),
-                    PopupMenuItem<String>(
+                    value: 'status',
+                  child: ListTile(
+                  leading: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                  color: widget.adminApproved ? Colors.green : Colors.red,
+                  shape: BoxShape.circle,
+                  ),
+                  ),
+                  title: Text(
+                  widget.adminApproved ? 'LIVE' : 'Pending',
+                  style: GoogleFonts.poppins(),
+                  ),
+                  ),
+                  ),
+                  PopupMenuItem<String>(
                       value: 'preview',
                       child: ListTile(
                         leading: const Icon(Icons.phone_iphone_outlined),
@@ -1869,6 +2001,8 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
 
   // --- MODIFIED: This layout now calls the new pricing section ---
   Widget _buildWideLayout() {
+    final me = context.watch<UserNotifier>().me;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1943,8 +2077,9 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                 const SizedBox(height: 24), // <-- ADD THIS SPACER
                 _buildPolicySection(),
                 const SizedBox(height: 24),
-                _buildLiveBankDetailsSection(), // <-- ADD THIS LINE
-                const SizedBox(height: 24), // <-- ADD THIS SPACER
+                if (me?.role == 'Owner')
+                  _buildLiveBankDetailsSection(), // <-- ADD THIS LINE
+                  const SizedBox(height: 24), // <-- ADD THIS SPACER
                 _buildLiveContractSection(),   // <-- ADD THIS LINE
 // <-- ADD THIS LINE
 
@@ -2717,6 +2852,92 @@ class Announcement {
       startDate: (map['startDate'] as Timestamp? ?? Timestamp.now()).toDate(),
       endDate: (map['endDate'] as Timestamp? ?? Timestamp.now()).toDate(),
       visibleTo: List<String>.from(map['visibleTo'] as List? ?? []),
+    );
+  }
+}
+
+
+class _BoardingEditPageLoader extends StatefulWidget {
+  final String serviceId;
+  const _BoardingEditPageLoader({Key? key, required this.serviceId}) : super(key: key);
+
+  @override
+  State<_BoardingEditPageLoader> createState() => __BoardingEditPageLoaderState();
+}
+
+class __BoardingEditPageLoaderState extends State<_BoardingEditPageLoader> {
+  late Future<Widget> _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _loadBoardingEditPage(widget.serviceId);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BoardingEditPageLoader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.serviceId != widget.serviceId) {
+      setState(() {
+        _loadFuture = _loadBoardingEditPage(widget.serviceId);
+      });
+    }
+  }
+
+  Future<Widget> _loadBoardingEditPage(String serviceId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return SignInPage();
+    }
+
+    final snap = await FirebaseFirestore.instance
+        .collection('users-sp-boarding')
+        .where('service_id', isEqualTo: serviceId)
+        .limit(1)
+        .get();
+
+    final d = snap.docs.first.data();
+    final refundPolicy = d['refund_policy'] as Map<String, dynamic>? ?? {};
+
+    return EditServicePage(
+      full_address: d['full_address'] as String? ?? '',
+      bank_account_num: d['bank_account_num'] as String? ?? '',
+      bank_ifsc: d['bank_ifsc'] as String? ?? '',
+      serviceId: serviceId,
+      description: d['description'] as String? ?? '',
+      refundPolicy: refundPolicy.map((k, v) => MapEntry(k, v.toString())),
+      walkingFee: d['walking_fee'] as String? ?? '',
+      openTime: d['open_time'] as String? ?? '',
+      closeTime: d['close_time'] as String? ?? '',
+      maxPetsAllowed: d['max_pets_allowed'] as String? ?? '',
+      features: (d['features'] as List?)?.cast<String>() ?? [],
+      pets: (d['pets'] as List?)?.cast<String>() ?? [],
+      street: d['street'] as String? ?? '',
+      areaName: d['area_name'] as String? ?? '',
+      state: d['state'] as String? ?? '',
+      district: d['district'] as String? ?? '',
+      postalCode: d['postal_code'] as String? ?? '',
+      shopName: d['shop_name'] as String? ?? '',
+      shopLocation: d['shop_location'] is GeoPoint
+          ? '${(d['shop_location'] as GeoPoint).latitude}, ${(d['shop_location'] as GeoPoint).longitude}'
+          : '',
+      image_urls: (d['image_urls'] as List?)?.cast<String>() ?? [],
+      maxPetsAllowedPerHour: d['max_pets_allowed_per_hour'] as String? ?? '',
+      partnerPolicyUrl: d['partner_policy_url'] as String? ?? '', // <-- ADD THIS LINE
+
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Widget>(
+      future: _loadFuture,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const ReusableSplashScreen();
+        }
+        return snap.data!;
+      },
     );
   }
 }

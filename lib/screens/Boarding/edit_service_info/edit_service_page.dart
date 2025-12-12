@@ -9,7 +9,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:multi_select_flutter/chip_display/multi_select_chip_display.dart';
 import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
@@ -24,6 +23,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../Colors/AppColor.dart';
+import '../../../providers/boarding_details_loader.dart';
 import '../../../services/places_service.dart';
 import '../boarding_service_page_detail.dart';
 import '../edit_history_page.dart';
@@ -1042,8 +1042,11 @@ class _EditServicePageState extends State<EditServicePage> {
 
       if (mounted) {
         await Provider.of<UserNotifier>(context, listen: false).refreshUserProfile();
-        context.go('/partner/${widget.serviceId}/profile');
-      }
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => BoardingDetailsLoader(serviceId: widget.serviceId), // Use 'const' if possible
+          ),
+        );      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred: $e')));
     } finally {

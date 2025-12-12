@@ -1,15 +1,19 @@
 // lib/screens/OtherBranchesPage.dart
 import "dart:html" as html;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart'; // You will need to add this package
+import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
+import 'package:shimmer/shimmer.dart';
+
+import '../../Colors/AppColor.dart';
+import '../../providers/boarding_details_loader.dart';
+import 'boarding_type.dart'; // You will need to add this package
 
 // --- Brand Colors ---
-const Color primaryColor = Color(0xFF2CB4B6);
-const Color accentColor = Color(0xFFF67B0D);
+
 const Color backgroundColor = Color(0xFFF7FAFC);
 const Color cardColor = Colors.white;
 const Color textColor = Color(0xFF2D3748);
@@ -94,7 +98,20 @@ class _OtherBranchesPageState extends State<OtherBranchesPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/business-type/${widget.serviceId}'),
+        onPressed: () {
+          // 🚀 Replacing context.go('/business-type/${widget.serviceId}')
+          // Navigate and replace the current screen, as this starts a new flow.
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => RunTypeSelectionPage(
+                uid: FirebaseAuth.instance.currentUser!.uid,
+                phone: FirebaseAuth.instance.currentUser!.phoneNumber ?? '',
+                email: FirebaseAuth.instance.currentUser!.email ?? '',
+                serviceId: widget.serviceId, // Pass the existing serviceId
+              ),
+            ),
+          );
+        },
         label: Text('Add New Branch', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
         icon: const Icon(Icons.add),
         backgroundColor: accentColor,
@@ -168,14 +185,21 @@ class _OtherBranchesPageState extends State<OtherBranchesPage> {
             return _BranchCard(
               branch: branches[index],
               onTap: () {
-                final newUrl = '/partner/${branches[index]['id']}';
-                // Using a combination for better web navigation
-                context.go(newUrl);
-                context.go(newUrl);
-                Future.delayed(
-                    const Duration(milliseconds: 100), () {
-                  html.window.location.href = newUrl;
-                });
+                // 1. Get the target service ID
+                final targetServiceId = branches[index]['id'];
+
+                // 2. 🚀 Replace redundant context.go() and manual URL manipulation
+                // with a single Navigator.pushReplacement.
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (ctx) => PartnerShell(
+                      serviceId: targetServiceId,
+                      // We are navigating to the main profile/overview page of the new branch
+                      currentPage: PartnerPage.profile,
+                      child: BoardingDetailsLoader(serviceId: targetServiceId),
+                    ),
+                  ),
+                );
               },
             );
           },

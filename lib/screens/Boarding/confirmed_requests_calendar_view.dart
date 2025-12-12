@@ -59,11 +59,14 @@ import 'boarding_requests.dart';
     // ADD THESE TWO LINES BACK
     final Function(DocumentSnapshot) onStart;
     final Function(DocumentSnapshot) onComplete;
+    final Function(DocumentSnapshot) onShowEarnings; // <--- ADD THIS
 
     const MonthlyBookingCalendar({
       Key? key,
       required this.serviceId,
-      required this.calendarType, required this.onStart, required this.onComplete,
+      required this.calendarType, required this.onStart,
+      required this.onShowEarnings, // <--- ADD THIS
+      required this.onComplete,
     }) : super(key: key);
   
     @override
@@ -687,6 +690,7 @@ import 'boarding_requests.dart';
                   content: SizedBox(
                     width: 400,
                     child: BoardingRequestCard(
+                      onShowEarnings: widget.onShowEarnings, // <--- PASS THIS
                       doc: event.doc,
                       selectedDates: event.allSelectedDates,
                       serviceId: widget.serviceId,
@@ -1688,6 +1692,7 @@ import 'boarding_requests.dart';
                 content: SizedBox(
                   width: 400,
                   child: BoardingRequestCard(
+                    onShowEarnings: widget.onShowEarnings, // <--- PASS THIS
                     doc: event.doc,
                     selectedDates: event.allSelectedDates,
                     serviceId: widget.serviceId,

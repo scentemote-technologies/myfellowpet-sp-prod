@@ -1,19 +1,24 @@
 import 'dart:html' as html; // <-- ADD THIS IMPORT
 
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../Colors/AppColor.dart';
+import '../../Widgets/reusable_splash_screen.dart';
 import '../../helper.dart';
 import '../../user_app/screens/Boarding/boarding_servicedetailspage.dart';
+import '../Boarding/OtherBranchesPage.dart';
+import '../Boarding/edit_service_info/edit_service_page.dart';
+import '../Boarding/partner_shell.dart';
 import '../Boarding/roles/role_service.dart';
+import '../Partner/email_signin.dart' hide primaryColor;
 
 // V V V PASTE THIS ENTIRE NEW CLASS AT THE BOTTOM OF YOUR FILE V V V
 
@@ -1346,7 +1351,18 @@ class _PetStoreDashboardState extends State<PetStoreDashboard> {
                   'Edit',
                   Icons.edit_outlined,
                   primaryColor,
-                      () => context.go('/partner/${widget.serviceId}/edit'),
+                      () {
+                    // 🚀 Replacing context.go('/partner/${widget.serviceId}/edit')
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => PartnerShell(
+                          serviceId: widget.serviceId,
+                          currentPage: PartnerPage.other, // Not a main sidebar item
+                          child: _BoardingEditPageLoader(serviceId: widget.serviceId), // The target edit page
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
               const SizedBox(width: 12),
@@ -1357,7 +1373,21 @@ class _PetStoreDashboardState extends State<PetStoreDashboard> {
                   'Branches',
                   Icons.store_outlined,
                   accentColor,
-                      () => context.go('/partner/${widget.serviceId}/branches'),
+                      () {
+                    // 🚀 Replacing context.go('/partner/${widget.serviceId}/branches')
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => PartnerShell(
+                          serviceId: widget.serviceId,
+                          currentPage: PartnerPage.other, // Not a main sidebar item
+                          child: OtherBranchesPage(
+                            serviceId: widget.serviceId,
+                            ownerId: FirebaseAuth.instance.currentUser!.uid, // Required parameter
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               const SizedBox(width: 12),
               _buildStatusIndicator(context),
@@ -1412,10 +1442,32 @@ class _PetStoreDashboardState extends State<PetStoreDashboard> {
                       _showPhonePreviewDialog(context);
                       break;
                     case 'edit':
-                      context.go('/partner/${widget.serviceId}/edit');
+                    // 🚀 Replacing context.go('/partner/${widget.serviceId}/edit')
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => PartnerShell(
+                            serviceId: widget.serviceId,
+                            currentPage: PartnerPage.other, // Not a main sidebar item
+                            child: _BoardingEditPageLoader(serviceId: widget.serviceId),
+                          ),
+                        ),
+                      );
                       break;
+
                     case 'branches':
-                      context.go('/partner/${widget.serviceId}/branches');
+                    // 🚀 Replacing context.go('/partner/${widget.serviceId}/branches')
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => PartnerShell(
+                            serviceId: widget.serviceId,
+                            currentPage: PartnerPage.other, // Not a main sidebar item
+                            child: OtherBranchesPage(
+                              serviceId: widget.serviceId,
+                              ownerId: FirebaseAuth.instance.currentUser!.uid, // Required parameter
+                            ),
+                          ),
+                        ),
+                      );
                       break;
                     case 'reviews':
                       _showReviewsDialog(context);
@@ -2376,6 +2428,92 @@ class Announcement {
       startDate: (map['startDate'] as Timestamp? ?? Timestamp.now()).toDate(),
       endDate: (map['endDate'] as Timestamp? ?? Timestamp.now()).toDate(),
       visibleTo: List<String>.from(map['visibleTo'] as List? ?? []),
+    );
+  }
+}
+
+
+class _BoardingEditPageLoader extends StatefulWidget {
+  final String serviceId;
+  const _BoardingEditPageLoader({Key? key, required this.serviceId}) : super(key: key);
+
+  @override
+  State<_BoardingEditPageLoader> createState() => __BoardingEditPageLoaderState();
+}
+
+class __BoardingEditPageLoaderState extends State<_BoardingEditPageLoader> {
+  late Future<Widget> _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _loadBoardingEditPage(widget.serviceId);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BoardingEditPageLoader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.serviceId != widget.serviceId) {
+      setState(() {
+        _loadFuture = _loadBoardingEditPage(widget.serviceId);
+      });
+    }
+  }
+
+  Future<Widget> _loadBoardingEditPage(String serviceId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return SignInPage();
+    }
+
+    final snap = await FirebaseFirestore.instance
+        .collection('users-sp-boarding')
+        .where('service_id', isEqualTo: serviceId)
+        .limit(1)
+        .get();
+
+    final d = snap.docs.first.data();
+    final refundPolicy = d['refund_policy'] as Map<String, dynamic>? ?? {};
+
+    return EditServicePage(
+      full_address: d['full_address'] as String? ?? '',
+      bank_account_num: d['bank_account_num'] as String? ?? '',
+      bank_ifsc: d['bank_ifsc'] as String? ?? '',
+      serviceId: serviceId,
+      description: d['description'] as String? ?? '',
+      refundPolicy: refundPolicy.map((k, v) => MapEntry(k, v.toString())),
+      walkingFee: d['walking_fee'] as String? ?? '',
+      openTime: d['open_time'] as String? ?? '',
+      closeTime: d['close_time'] as String? ?? '',
+      maxPetsAllowed: d['max_pets_allowed'] as String? ?? '',
+      features: (d['features'] as List?)?.cast<String>() ?? [],
+      pets: (d['pets'] as List?)?.cast<String>() ?? [],
+      street: d['street'] as String? ?? '',
+      areaName: d['area_name'] as String? ?? '',
+      state: d['state'] as String? ?? '',
+      district: d['district'] as String? ?? '',
+      postalCode: d['postal_code'] as String? ?? '',
+      shopName: d['shop_name'] as String? ?? '',
+      shopLocation: d['shop_location'] is GeoPoint
+          ? '${(d['shop_location'] as GeoPoint).latitude}, ${(d['shop_location'] as GeoPoint).longitude}'
+          : '',
+      image_urls: (d['image_urls'] as List?)?.cast<String>() ?? [],
+      maxPetsAllowedPerHour: d['max_pets_allowed_per_hour'] as String? ?? '',
+      partnerPolicyUrl: d['partner_policy_url'] as String? ?? '', // <-- ADD THIS LINE
+
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Widget>(
+      future: _loadFuture,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const ReusableSplashScreen();
+        }
+        return snap.data!;
+      },
     );
   }
 }

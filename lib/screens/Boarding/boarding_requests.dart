@@ -860,6 +860,253 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
   DateTimeRange? _selectedRange;
   SortOrder _sortOrder = SortOrder.descending;
 
+  // In _OvernightPendingRequestsState
+  // ADD this method to _OvernightPendingRequestsState
+  Widget _buildDialogHeader(String title, BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            customBorder: const CircleBorder(),
+            child: const Padding(
+              padding: EdgeInsets.all(4.0),
+              child: Icon(Icons.close, color: Colors.black87, size: 24),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// REPLACE _showEarningsBreakdownDialog
+  void _showEarningsBreakdownDialog(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    final bool gstRegistered = data['gstRegistered'] == true;
+    final bool checkoutEnabled = data['checkoutEnabled'] == true;
+
+    final double serviceExcGst  = (data['sp_service_fee_exc_gst'] as num? ?? 0).toDouble();
+    final double gstOnService   = (data['gst_on_sp_service'] as num? ?? 0).toDouble();
+    final double platformExcGst = (data['platform_fee_exc_gst'] as num? ?? 0).toDouble();
+    final double gstOnPlatform  = (data['gst_on_platform_fee'] as num? ?? 0).toDouble();
+
+    /// CORRECT SERVICE PROVIDER EARNING LOGIC
+    final double spIncomeTotal = serviceExcGst + (gstRegistered ? gstOnService : 0);
+
+    /// Customer total platform fee (not deducted from SP)
+    final double platformTotal = checkoutEnabled ? platformExcGst + gstOnPlatform : 0;
+
+    /// GST percentage helper
+    String pct(double base, double gst) {
+      if (base <= 0 || gst <= 0) return "";
+      return "(${(gst / base * 100).toStringAsFixed(0)}%)";
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: EdgeInsets.zero,
+          backgroundColor: Colors.white,
+          title: _buildDialogHeader("Earnings Summary", context),
+
+          content: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                // ============= USER BILL SECTION =============
+                _sectionHeader("WHAT THE USER PAID"),
+                _ledgerRow("Service Fee", serviceExcGst),
+                if (gstRegistered)
+                  _ledgerRow("GST on Service Fee ${pct(serviceExcGst, gstOnService)}", gstOnService),
+
+                if (checkoutEnabled) ...[
+                  _ledgerRow("Platform Fee (charged to user)", platformExcGst),
+                  _ledgerRow(
+                      "GST on Platform Fee ${pct(platformExcGst, gstOnPlatform)}",
+                      gstOnPlatform),
+                ],
+
+                _divider(),
+
+                _ledgerRow("Total User Payment",
+                    serviceExcGst +
+                        (gstRegistered ? gstOnService : 0) +
+                        platformTotal,
+                    bold: true),
+
+                const SizedBox(height: 24),
+
+                // ============= SP EARNINGS SECTION =============
+                _sectionHeader("YOUR EARNINGS"),
+
+                _ledgerRow("Service Fee (Exc. GST)", serviceExcGst),
+                if (gstRegistered)
+                  _ledgerRow("GST on Service Fee", gstOnService),
+
+                _divider(),
+
+                // ========= GREEN OUTLINE TOTAL EARNING BOX =========
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green, // your green-accent color
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Total earning from this booking",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "₹${spIncomeTotal.toStringAsFixed(2)}",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,       // bigger, more premium
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+
+                Text(
+                  "This is the exact amount you earn for this booking.",
+                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                ),
+
+                const SizedBox(height: 24),
+
+                // ============= PLATFORM CHARGES NOTE =============
+                if (checkoutEnabled)
+                  Text(
+                    "Note: Platform fees shown above are charged to the user and "
+                        "do NOT reduce your payout.",
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                "CLOSE",
+                style: GoogleFonts.poppins(
+                  color: primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  Widget _sectionHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0, top: 12.0),
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.shade600,
+        ),
+      ),
+    );
+  }
+
+  Widget _divider() => Divider(
+    thickness: 1,
+    height: 20,
+    color: Colors.grey.shade300,
+  );
+
+  Widget _ledgerRow(
+      String label,
+      double amount, {
+        bool deduction = false,
+        bool highlight = false,
+        bool bold = false,
+        bool big = false,
+      }) {
+    Color valueColor =
+    deduction ? Colors.red.shade700 :
+    highlight ? primaryColor :
+    Colors.black87;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Text(
+            "${deduction ? '-' : ''}₹${amount.toStringAsFixed(2)}",
+            style: GoogleFonts.poppins(
+              fontSize: big ? 16 : 14,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+              color: valueColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   // Brand Colors
   static const Color primaryColor = Color(0xFF2CB4B6);
@@ -890,146 +1137,12 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
       backgroundColor: backgroundColor,
       body: Column(
         children: [
-          _buildFilterBar(),
           Expanded(child: _buildResults()),
         ],
       ),
     );
   }
-  // Replace your existing _buildFilterBar method with this one
 
-  Widget _buildFilterBar() {
-    // This part for handling active search stays the same
-    if (_isSearchActive) {
-      return Container(
-        padding: const EdgeInsets.fromLTRB(8, 1, 8, 1),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-        ),
-        child: Row(
-          children: [
-            Expanded(child: _buildSearchField()),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.grey),
-              tooltip: 'Close Search',
-              onPressed: () {
-                setState(() {
-                  _isSearchActive = false;
-                  _searchController.clear();
-                });
-              },
-            ),
-          ],
-        ),
-      );
-    }
-
-    // This is the main filter bar
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const double wideBreakpoint = 768.0;
-          bool isWide = constraints.maxWidth >= wideBreakpoint;
-
-          if (isWide) {
-            // WIDE LAYOUT (search bar on top, filters below)
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchField(),
-                const SizedBox(height: 5),
-                OrderFilters(
-                  sortOrder: _sortOrder,
-                  selectedRange: _selectedRange,
-                  onChanged: (newSortOrder, newRange) {
-                    setState(() {
-                      _sortOrder = newSortOrder;
-                      _selectedRange = newRange;
-                    });
-                  },
-                  showBookingDateSort: false, // ✅ Hide "Sort by Booking Date" here
-                ),
-              ],
-            );
-          }
-
-          else {
-            // --- ▼▼▼ THIS IS THE UPDATED NARROW LAYOUT ▼▼▼ ---
-            return Row(
-              children: [
-                // The new button that opens the filter drawer
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.filter_list, size: 18),
-                  label: Text('Filters', style: GoogleFonts.poppins()),
-                  onPressed: () => _showFilterSheet(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    side: BorderSide(color: Colors.grey.shade300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                // Show a dot if a filter is active
-                if (_selectedRange != null || _sortOrder != SortOrder.descending)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: CircleAvatar(
-                      radius: 4,
-                      backgroundColor: accentColor,
-                    ),
-                  ),
-                const Spacer(), // Pushes the search icon to the end
-                // The existing search icon
-                IconButton(
-                  icon: const Icon(Icons.search, color: primaryColor),
-                  tooltip: 'Search Requests',
-                  onPressed: () {
-                    setState(() {
-                      _isSearchActive = true;
-                    });
-                  },
-                ),
-              ],
-            );
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchController,
-      style: GoogleFonts.poppins(),
-      decoration: InputDecoration(
-        hintText: 'Search by Request ID...',
-        hintStyle: GoogleFonts.poppins(color: Colors.grey.shade500),
-        prefixIcon: const Icon(Icons.search, color: primaryColor),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
-        ),
-      ),
-    );
-  }
-
-  // Inside _ConfirmedRequestsState
-  // Inside _ConfirmedRequestsState
   Widget _buildResults() {
     final baseQuery = FirebaseFirestore.instance
         .collection('users-sp-boarding')
@@ -1096,6 +1209,7 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
             calendarType: CalendarType.confirmed,
             onStart: (doc) => _onStartOrder(doc),
             onComplete: (doc) => _onCompleteOrder(doc),
+            onShowEarnings: (doc) => _showEarningsBreakdownDialog(context, doc), // <--- ADD THIS
           );
         }
         // Fallback for unexpected missing data
@@ -1137,95 +1251,119 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
     );
   }
 
-  Future<void> _showInvalidStartDialog() async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: const [
-            Icon(Icons.info_outline, color: Color(0xFF2CB4B6), size: 28),
-            SizedBox(width: 8),
-            Text('Hold On!'),
-          ],
-        ),
-        content: Text(
-          'You can only start this booking on the first day of the selected dates.',
-          style: GoogleFonts.poppins(fontSize: 15),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'OK',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF2CB4B6),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  // --- All your helper methods for dialogs and actions ---
-
   Future<void> _handleVerifiedAndComplete(DocumentSnapshot doc) async {
     int rating = 5;
     String remarks = '';
+    // Define a clean accent color for the UI
+    const Color accentColor = Color(0xFFF67B0D);
+    const Color primaryColor = Color(0xFF2CB4B6);
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Rate & Remarks',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Please provide a rating for this service.',
-                style: GoogleFonts.poppins()),
-            const SizedBox(height: 16),
-            StatefulBuilder(builder: (ctx2, setState2) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  return IconButton(
-                    icon: Icon(
-                        i < rating
-                            ? Icons.star_rounded
-                            : Icons.star_border_rounded,
-                        color: Colors.amber,
-                        size: 32),
-                    onPressed: () => setState2(() => rating = i + 1),
-                  );
-                }),
-              );
-            }),
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Remarks (optional)',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
+      // Use a clean, compact Dialog wrapper
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch for full-width buttons
+            children: [
+              // --- Header & Title ---
+              Icon(Icons.star_half_rounded, color: primaryColor, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Finalize & Rate Service',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
               ),
-              onChanged: (v) => remarks = v,
-              style: GoogleFonts.poppins(),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Please provide a rating for this service before completion.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 24),
+
+              // --- Rating Stars (Stateful) ---
+              StatefulBuilder(builder: (ctx2, setState2) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    return IconButton(
+                      icon: Icon(
+                          i < rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: Colors.amber,
+                          size: 38), // Slightly larger stars
+                      onPressed: () => setState2(() => rating = i + 1),
+                    );
+                  }),
+                );
+              }),
+              const SizedBox(height: 24),
+
+              // --- Remarks Text Field ---
+              TextField(
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Remarks (optional) - How was the service?',
+                  hintStyle: GoogleFonts.poppins(color: Colors.grey.shade400),
+                  contentPadding: const EdgeInsets.all(16),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12), // Rounded border
+                      borderSide: BorderSide(color: Colors.grey.shade300)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: primaryColor, width: 2)),
+                ),
+                onChanged: (v) => remarks = v,
+                style: GoogleFonts.poppins(fontSize: 15),
+              ),
+              const SizedBox(height: 32),
+
+              // --- Action Buttons ---
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text('Cancel', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 2,
+                      ),
+                      child: Text('Submit & Complete', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: GoogleFonts.poppins())),
-          ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text('Submit', style: GoogleFonts.poppins())),
-        ],
       ),
     );
 
     if (confirmed != true) return;
+
+    // --- EXISTING DATA MANIPULATION LOGIC (NO CHANGE) ---
 
     final srcRef = doc.reference;
     final firestore = FirebaseFirestore.instance;
@@ -1299,7 +1437,6 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
 
     print('✅ Booking ${doc.id} moved to completed_orders with subcollections.');
   }
-
 
   Future<String?> _showPinVerificationDialog(BuildContext context, {required String title}) async {
     final pinController = TextEditingController();
@@ -1844,6 +1981,7 @@ class BoardingRequestCard extends StatefulWidget {
   final VoidCallback onComplete;
   final VoidCallback onStart;
   final bool frompending;
+  final Function(DocumentSnapshot) onShowEarnings; // <--- ADD NEW CALLBACK
 
   const BoardingRequestCard({
     Key? key,
@@ -1852,6 +1990,7 @@ class BoardingRequestCard extends StatefulWidget {
     required this.mode,
     required this.onComplete,
     required this.serviceId,
+    required this.onShowEarnings, // <--- ADD NEW REQUIRED FIELD
     required this.frompending,
     required this.onStart,
   }) : super(key: key);
@@ -1866,6 +2005,66 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
   String? notificationEmail;
   String? ownerEmail;
 
+  // ADD THIS METHOD inside the _BoardingRequestCardState class:
+
+  // Inside _BoardingRequestCardState:
+
+  Widget _buildInfoColumn(String label, String value,
+      {required IconData icon, required VoidCallback onTap}) {
+    // Define primaryColor locally or ensure it's accessible
+    const Color primaryColor = Color(0xFF2CB4B6);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, color: primaryColor, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      value,
+                      softWrap: true,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87),
+                    ),
+                  ),
+                  // The clickable icon
+                  GestureDetector( // <--- WRAP ICON IN GESTURE DETECTOR
+                    onTap: onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6, right: 0),
+                      child: const Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
   @override
   void initState() {
     super.initState();
@@ -1893,6 +2092,8 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
       print("Error fetching shop details: $e");
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -1966,6 +2167,13 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
         ? DateTime(widget.selectedDates.first.year, widget.selectedDates.first.month, widget.selectedDates.first.day)
         : DateTime.now();
     final isStartEnabled = todayDate.isAtSameMomentAs(firstDate) || todayDate.isAfter(firstDate);
+    final state = (context).findAncestorStateOfType<_ConfirmedRequestsState>();
+    final earnings = data['sp_service_fee_exc_gst'] as double? ??
+        data['sp_service_fee_inc_gst'] as double? ?? // Fallback 2: Try Inc GST
+        data['sp_service_fee'] as double? ?? // Fallback 3: Old cost_breakdown field
+        0.0;
+
+
 
 
     return Card(
@@ -2094,8 +2302,17 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                _infoRow(
-                    'Amount', '₹${totalCostWithGst.toStringAsFixed(2)}'),
+                // If using the optimized version where _buildInfoColumn handles the click:
+
+                _buildInfoColumn(
+                  'Your Earnings',
+                  '₹${earnings.toStringAsFixed(2)}',
+                  icon: Icons.account_balance_wallet_outlined,
+                  onTap: () {
+                    print('DEBUG: FINAL CHECK - Calling widget.onShowEarnings for ${widget.doc.id}');
+                    widget.onShowEarnings(widget.doc); // This is the function passed from ConfirmedRequestsState
+                  },
+                ),
               ],
             ),
 

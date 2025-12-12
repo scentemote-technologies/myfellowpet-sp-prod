@@ -6,13 +6,12 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import '../../../Colors/AppColor.dart';
-import '../../HomePage/mainhomescreen.dart';
+import '../../Partner/email_signin.dart' hide primaryColor;
 
 class EditProfilePage extends StatefulWidget {
   final String serviceId;
@@ -100,7 +99,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       await FirebaseAuth.instance.signOut();
-      if (mounted) context.go('/partner-with-us');
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SignInPage(), // Use 'const' if possible
+          ),
+        );
+      }
 
     } on FirebaseFunctionsException catch (e) {
       debugPrint("🔥 Step 2 FAILED: Cloud Function returned an error. Code: ${e.code}, Message: ${e.message}");
@@ -378,320 +383,250 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-
-
-
-
   Future<void> _showChangePhoneDialog() async {
-    final auth = FirebaseAuth.instance;
     final docRef = FirebaseFirestore.instance
         .collection('users-sp-boarding')
         .doc(widget.serviceId);
 
-    // 0️⃣ PRE-CHECK: last phone-change
+    // 0️⃣ CHECK 14-day restriction
     final snap = await docRef.get();
-    final lastChangedTs = (snap.data()?['PhoneNumLastChanged'] as Timestamp?);
+    final lastChangedTs = snap.data()?['PhoneNumLastChanged'] as Timestamp?;
     if (lastChangedTs != null) {
-      final daysSince = DateTime.now()
-          .difference(lastChangedTs.toDate())
-          .inDays;
-      if (daysSince < 14) {
-        final daysLeft = 14 - daysSince;
+      final days = DateTime.now().difference(lastChangedTs.toDate()).inDays;
+      if (days < 14) {
+        final left = 14 - days;
         await showDialog(
           context: context,
-          barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-            title: Text('Change Phone Number',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'You last changed your phone on '
-                      '${DateFormat.yMMMd().format(lastChangedTs.toDate())}.',
-                  style: GoogleFonts.poppins(),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'You can change it again in $daysLeft '
-                      'day${daysLeft>1?"s":""}.',
-                  style: GoogleFonts.poppins(),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'If you need to change it immediately, '
-                      'please go to Support → Raise a ticket '
-                      'or Request a Callback.',
-                  style: GoogleFonts.poppins(fontSize: 12),
-                ),
-              ],
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Text("Change Phone Number"),
+            content: Text(
+              "You changed your phone recently.\n"
+                  "You can change it again in $left day${left > 1 ? 's' : ''}.",
+              style: GoogleFonts.poppins(),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('OK', style: GoogleFonts.poppins()),
-              )
-            ],
+
           ),
         );
         return;
       }
     }
 
-    // ↘️ Otherwise, proceed through the OTP steps exactly as before…
-    int step = 0;
-    bool loading = false;
-    String newPhone = '';
-    String oldVerId = '', newVerId = '';
-    final controller = TextEditingController();
+    // 1️⃣ STATE VARIABLES
+    String newPhone = "";
+    String otp = "";
+    bool sendingOtp = false;
+    bool verifyingOtp = false;
+    bool verified = false;
 
+    // Determine if test mode or live mode
+    Future<String> getSmsFunctionName() async {
+      final settingsSnap = await FirebaseFirestore.instance
+          .collection("settings")
+          .doc("employees")
+          .get();
+      final data = settingsSnap.data() ?? {};
+      final live = data["number_verification"] == true;
+      return live ? "sendSms" : "sendTestSms";
+    }
+
+    Future<String> getVerifyFunctionName() async {
+      final settingsSnap = await FirebaseFirestore.instance
+          .collection("settings")
+          .doc("employees")
+          .get();
+      final data = settingsSnap.data() ?? {};
+      final live = data["number_verification"] == true;
+      return live ? "verifySmsCode" : "verifyTestSmsCode";
+    }
+
+    // 2️⃣ SHOW DIALOG
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
-        Widget content;
-        List<Widget> actions = [];
-
-        switch (step) {
-          case 0:
-          // collect new #
-            content = Column(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Text("Change Phone Number", style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            content: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Old Phone:',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-                Text(widget.currentPhone,
-                    style: GoogleFonts.poppins(color: Colors.black54)),
+                // Current phone number
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Current: ${widget.currentPhone}",
+                        style: GoogleFonts.poppins(fontSize: 14),
+                      ),
+                    ),
+                    if (verified)
+                      Container(
+                        padding: EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.check, color: Colors.white, size: 14),
+                      )
+                  ],
+                ),
+
                 const SizedBox(height: 16),
+
+                // New number field
                 TextField(
-                  controller: controller,
+                  enabled: !verified,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    hintText: 'Enter new phone number',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    labelText: "New Phone Number",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
+                  onChanged: (v) => newPhone = v.startsWith("+") ? v : "+91$v",
                 ),
+
+                const SizedBox(height: 16),
+
+                if (!verified) ...[
+                  // Send OTP Button
+                  ElevatedButton(
+                    onPressed: sendingOtp
+                        ? null
+                        : () async {
+                      if (newPhone.isEmpty) return;
+                      setState(() => sendingOtp = true);
+
+                      final fn = await getSmsFunctionName();
+                      final callable = FirebaseFunctions.instance.httpsCallable(fn);
+
+                      try {
+                        await callable.call({
+                          "phoneNumber": newPhone,
+                          "docId": widget.serviceId,
+                          "verificationType": "sms",
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("OTP sent!")),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("OTP failed: $e")),
+                        );
+                      }
+
+                      setState(() => sendingOtp = false);
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                    child: sendingOtp
+                        ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                        SizedBox(width: 12),
+                        Text("Sending...", style: GoogleFonts.poppins(color: Colors.white)),
+                      ],
+                    )
+                        : Text("Send OTP", style: GoogleFonts.poppins(color: Colors.white)),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // OTP field
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: "Enter OTP",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (v) => otp = v,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Verify OTP Button
+                  ElevatedButton(
+                    onPressed: verifyingOtp
+                        ? null
+                        : () async {
+                      if (otp.isEmpty) return;
+                      setState(() => verifyingOtp = true);
+
+                      final verifyFn = await getVerifyFunctionName();
+                      final callable = FirebaseFunctions.instance.httpsCallable(verifyFn);
+
+                      try {
+                        final result = await callable.call({
+                          "code": otp,
+                          "docId": widget.serviceId,
+                        });
+
+                        if (result.data["success"] == true) {
+                          await docRef.update({
+                            "owner_phone": newPhone,
+                            "PhoneNumLastChanged": FieldValue.serverTimestamp(),
+                          });
+
+                          setState(() => verified = true);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Phone updated!")),
+                          );
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Verification failed: $e")),
+                        );
+                      }
+
+                      setState(() => verifyingOtp = false);
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                    child: verifyingOtp
+                        ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                        SizedBox(width: 12),
+                        Text("Verifying...", style: GoogleFonts.poppins(color: Colors.white)),
+                      ],
+                    )
+                        : Text("Verify OTP", style: GoogleFonts.poppins(color: Colors.white)),
+                  ),
+                ],
+                  SizedBox(height: 5),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.black87)),
+                  ),
+
+                if (verified) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    "Number verified and updated!",
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text("Done", style: GoogleFonts.poppins()),
+                  )
+                ]
               ],
-            );
-            actions = [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.black87)),
-              ),
-              ElevatedButton(
-                onPressed: loading
-                    ? null
-                    : () async {
-                  final v = controller.text.trim();
-                  if (v.isEmpty) return;
-                  setState(() => loading = true);
-                  newPhone = v.startsWith('+') ? v : '+91$v';
-                  await auth.verifyPhoneNumber(
-                    phoneNumber: widget.currentPhone.startsWith('+')
-                        ? widget.currentPhone
-                        : '+91${widget.currentPhone}',
-                    verificationCompleted: (_) {},
-                    verificationFailed: (e) {
-                      setState(() => loading = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Old OTP failed: ${e.message}',
-                            style: GoogleFonts.poppins(color: Colors.white),
-                          ),
-                        ),
-                      );
-                    },
-                    codeSent: (verId, _) {
-                      oldVerId = verId;
-                      setState(() {
-                        step = 1;
-                        loading = false;
-                        controller.clear();
-                      });
-                    },
-                    codeAutoRetrievalTimeout: (verId) => oldVerId = verId,
-                    timeout: const Duration(seconds: 60),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: loading ? Colors.grey : primaryColor,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: loading
-                    ? Text('Sending OTP…', style: GoogleFonts.poppins())
-                    : Text('Next', style: GoogleFonts.poppins(color: Colors.white)),
-              ),
-            ];
-            break;
-
-          case 1:
-          // verify old OTP
-            content = TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'Enter OTP sent to old phone',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            );
-            actions = [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.black87)),
-              ),
-              ElevatedButton(
-                onPressed: loading
-                    ? null
-                    : () async {
-                  final code = controller.text.trim();
-                  if (code.isEmpty) return;
-                  setState(() => loading = true);
-                  try {
-                    final oldCred = PhoneAuthProvider.credential(
-                        verificationId: oldVerId, smsCode: code);
-                    await auth.currentUser!
-                        .reauthenticateWithCredential(oldCred);
-
-                    // now send new OTP
-                    await auth.verifyPhoneNumber(
-                      phoneNumber: newPhone,
-                      verificationCompleted: (_) {},
-                      verificationFailed: (e) {
-                        setState(() => loading = false);
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(
-                          content: Text(
-                            'New OTP failed: ${e.message}',
-                            style: GoogleFonts.poppins(
-                                color: Colors.white),
-                          ),
-                        ));
-                      },
-                      codeSent: (verId, _) => setState(() {
-                        newVerId = verId;
-                        step = 2;
-                        loading = false;
-                        controller.clear();
-                      }),
-                      codeAutoRetrievalTimeout: (verId) =>
-                      newVerId = verId,
-                      timeout: const Duration(seconds: 60),
-                    );
-                  } catch (e) {
-                    setState(() => loading = false);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(
-                      content: Text(
-                        'Old reauth failed: $e',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white),
-                      ),
-                    ));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: loading ? Colors.grey : primaryColor,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: loading
-                    ? Text('Verifying…', style: GoogleFonts.poppins())
-                    : Text('Verify',
-                    style: GoogleFonts.poppins(color: Colors.white)),
-              ),
-            ];
-            break;
-
-          default: // case 2
-          // verify new OTP
-            content = TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'Enter OTP sent to new phone',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            );
-            actions = [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.black87)),
-              ),
-              ElevatedButton(
-                onPressed: loading
-                    ? null
-                    : () async {
-                  final code = controller.text.trim();
-                  if (code.isEmpty) return;
-                  setState(() => loading = true);
-                  try {
-                    final newCred = PhoneAuthProvider.credential(
-                        verificationId: newVerId, smsCode: code);
-                    await auth.currentUser!
-                        .updatePhoneNumber(newCred);
-
-                    // persist + timestamp
-                    await docRef.update({
-                      'owner_phone': newPhone,
-                      'PhoneNumLastChanged':
-                      FieldValue.serverTimestamp(),
-                    });
-
-                    Navigator.of(ctx).pop();
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(
-                      content: Text(
-                        'Phone updated successfully!',
-                        style: GoogleFonts.poppins(),
-                      ),
-                    ));
-                  } catch (e) {
-                    setState(() => loading = false);
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(SnackBar(
-                      content: Text(
-                        'Update failed: $e',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white),
-                      ),
-                    ));
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: loading ? Colors.grey : primaryColor,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: loading
-                    ? Text('Updating…', style: GoogleFonts.poppins())
-                    : Text('Update',
-                    style: GoogleFonts.poppins(color: Colors.white)),
-              ),
-            ];
-        }
-
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          title: Text(
-            ['Change Phone Number', 'Verify Old Phone', 'Verify New Phone'][step],
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          ),
-          content: content,
-          actions: actions,
-        );
-      }),
+            ),
+          );
+        },
+      ),
     );
   }
+
 
 
   @override
@@ -713,18 +648,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
             onTap: _showChangeEmailDialog,
           ),
           Divider(),
-         /* ListTile(
-            leading: Icon(Icons.email, color: primaryColor),
-            title: Text('Change Login Email', style: GoogleFonts.poppins()),
-            trailing: Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: _showChangeLoginEmailDialog,
-          ),*/
-          /* ListTile(
+
+          ListTile(
             leading: Icon(Icons.phone, color: primaryColor),
             title: Text('Change Phone Number', style: GoogleFonts.poppins()),
             trailing: Icon(Icons.arrow_forward_ios, size: 16),
             onTap: _showChangePhoneDialog,
-          ),*/
+          ),
         ],
       ),
     );

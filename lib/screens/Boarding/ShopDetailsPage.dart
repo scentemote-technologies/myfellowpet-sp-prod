@@ -11,7 +11,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -19,7 +18,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:multi_select_flutter/chip_display/multi_select_chip_display.dart';
 import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
 import 'package:multi_select_flutter/util/multi_select_item.dart';
+import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
 
+import '../../providers/boarding_details_loader.dart';
 import '../Partner/partner_appbar.dart';
 import '../../services/places_service.dart';
 
@@ -593,11 +594,26 @@ class _ShopDetailsPageState extends State<ShopDetailsPage> {
       debugPrint('🔚 Employee creation block complete');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('All details submitted successfully!')),
+        const SnackBar(content: Text('All details submitted successfully!')),
       );
 
-      // now navigate to BoardingDetailsPage with all required args:
-      context.go('/partner/${docRef.id}');
+      final serviceId = docRef.id;
+
+// 🚀 REPLACING context.go('/partner/${docRef.id}')
+// Navigate and clear the stack, ensuring the user lands on the main dashboard.
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => PartnerShell(
+              serviceId: serviceId,
+              currentPage: PartnerPage.profile, // Directing to the main profile page (Overview)
+              // The page corresponding to the root /partner/:serviceId route is the loader
+              child: BoardingDetailsLoader(serviceId: serviceId),
+            ),
+          ),
+              (Route<dynamic> route) => false, // Clears the history
+        );
+      }
 
     } catch (e) {
       setState(() => _errorText = 'Submission error: $e');

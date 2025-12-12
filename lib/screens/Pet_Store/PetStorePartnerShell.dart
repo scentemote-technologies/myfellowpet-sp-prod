@@ -1,41 +1,50 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
+// import 'package:go_router/go_router.dart'; // <<< REMOVED
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../Boarding/partner_shell.dart';
 import '../Boarding/roles/role_service.dart';
+// Assuming PartnerPage enum is imported from here or another shared file
+import '../Pet_Store/pet_store_details_loader.dart'; // REQUIRED IMPORT
+import '../Pet_Store/store stuff/inventory.dart'; // REQUIRED IMPORT
+import '../Partner/email_signin.dart'; // REQUIRED IMPORT (for sign out target)
+
 
 const Color primary = Color(0xFF2CB4B6);
 const double sidebarWidth = 300.0;
 const double kDesktopBreakpoint = 1000.0;
 
+// --- NEW MENU ITEM DEFINITION using the existing PartnerPage Enum ---
+const _petStoreMenuItems = [
+  {'label': 'Overview', 'icon': Icons.dashboard, 'page': PartnerPage.profile},
+  {'label': 'Inventory', 'icon': Icons.inventory_2_outlined, 'page': PartnerPage.other}, // Using 'other' for simplicity
+];
+// -------------------------------------------------------------------
+
+
 class PetStorePartnerShell extends StatelessWidget {
   final String serviceId;
-  final String? currentLocation;
+  // REMOVED: final String? currentLocation;
+  final PartnerPage currentPage; // <<< NEW PROPERTY
   final Widget child;
   final Widget? phonePreview;
 
   const PetStorePartnerShell({
     Key? key,
     required this.serviceId,
-    required this.currentLocation,
+    // REMOVED: required this.currentLocation,
+    required this.currentPage, // <<< REQUIRED
     required this.child,
     this.phonePreview,
   }) : super(key: key);
 
-  static const _menuItems = [
-    {'label': 'Overview', 'icon': Icons.dashboard, 'path': 'profile'},
-    {'label': 'Inventory', 'icon': Icons.inventory_2_outlined, 'path': 'inventory'},
-  ];
-
-  String _getCurrentTitle(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    final base = '/partner/pet-store/$serviceId';
-    for (final item in _menuItems) {
-      final target = '$base/${item['path']}';
-      if (location.startsWith(target)) return item['label'] as String;
+  // UPDATED: Now uses currentPage enum for title
+  String _getCurrentTitle() {
+    for (final item in _petStoreMenuItems) {
+      if (item['page'] == currentPage) return item['label'] as String;
     }
     return 'Partner Panel';
   }
@@ -46,14 +55,10 @@ class PetStorePartnerShell extends StatelessWidget {
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= kDesktopBreakpoint;
 
-        // REPLACE IT WITH THIS
         if (isWide) {
-          // DESKTOP / WIDE LAYOUT
-
-          // Calculate the available width for the main content area
-          double mainContentWidth = constraints.maxWidth - sidebarWidth - 1; // 1 for the divider
+          double mainContentWidth = constraints.maxWidth - sidebarWidth - 1;
           if (phonePreview != null) {
-            mainContentWidth -= 400; // Subtract phone preview width if it exists
+            mainContentWidth -= 400;
           }
 
           return Scaffold(
@@ -64,11 +69,11 @@ class PetStorePartnerShell extends StatelessWidget {
                   color: Colors.white,
                   child: _SidebarContent(
                     serviceId: serviceId,
+                    currentPage: currentPage, // <<< PASS NEW PROPERTY
                     onSignOut: () => _confirmAndSignOut(context),
                   ),
                 ),
                 const VerticalDivider(width: 1),
-                // Use a SizedBox with the calculated width instead of the problematic Expanded
                 SizedBox(
                   width: mainContentWidth,
                   child: child,
@@ -85,8 +90,9 @@ class PetStorePartnerShell extends StatelessWidget {
         } else {
           return Scaffold(
             appBar: AppBar(
+              // UPDATED: Use the new title method
               title: Text(
-                _getCurrentTitle(context),
+                _getCurrentTitle(),
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
               backgroundColor: Colors.white,
@@ -104,6 +110,7 @@ class PetStorePartnerShell extends StatelessWidget {
               width: sidebarWidth,
               child: _SidebarContent(
                 serviceId: serviceId,
+                currentPage: currentPage, // <<< PASS NEW PROPERTY
                 onSignOut: () {
                   Navigator.of(context).pop();
                   _confirmAndSignOut(context);
@@ -116,7 +123,6 @@ class PetStorePartnerShell extends StatelessWidget {
       },
     );
   }
-
   Future<void> _confirmAndSignOut(BuildContext context) async {
     final shouldSignOut = await showDialog<bool>(
       context: context,
@@ -145,7 +151,14 @@ class PetStorePartnerShell extends StatelessWidget {
     if (!shouldSignOut) return;
 
     await FirebaseAuth.instance.signOut();
-    context.go('/');
+
+    // 🚀 REPLACED context.go('/') with standard pushAndRemoveUntil
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => SignInPage()),
+            (Route<dynamic> route) => false,
+      );
+    }
   }
 
   void _showPhonePreviewDialog(BuildContext context) {
@@ -167,24 +180,40 @@ class PetStorePartnerShell extends StatelessWidget {
 
 class _SidebarContent extends StatelessWidget {
   final String serviceId;
+  final PartnerPage currentPage; // <<< NEW PROPERTY
   final VoidCallback onSignOut;
 
   const _SidebarContent({
     Key? key,
     required this.serviceId,
+    required this.currentPage, // <<< REQUIRED
     required this.onSignOut,
   }) : super(key: key);
 
+  // --- HELPER FUNCTION TO GET THE WIDGET FOR NAVIGATION ---
+  Widget _getPetStoreChildWidget(PartnerPage page, String sid) {
+    switch (page) {
+      case PartnerPage.profile:
+        return PetStoreDetailsLoader(serviceId: sid);
+      case PartnerPage.other: // This is where Inventory is mapped
+        return InventoryPage(serviceId: sid);
+      default:
+        return const Center(child: Text("Page Not Found"));
+    }
+  }
+  // ---------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final base = '/partner/pet-store/$serviceId';
-    final location = GoRouterState.of(context).uri.toString();
+    // REMOVED: final base = '/partner/pet-store/$serviceId';
+    // REMOVED: final location = GoRouterState.of(context).uri.toString();
     final me = context.watch<UserNotifier>().me;
     final currentUser = FirebaseAuth.instance.currentUser;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ... (Header remains the same)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
           child: Row(
@@ -200,20 +229,35 @@ class _SidebarContent extends StatelessWidget {
           ),
         ),
         Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
+
+        // --- MENU LIST ---
         Expanded(
           child: ListView.builder(
             padding: EdgeInsets.zero,
-            itemCount: PetStorePartnerShell._menuItems.length,
+            itemCount: _petStoreMenuItems.length,
             itemBuilder: (ctx, i) {
-              final item = PetStorePartnerShell._menuItems[i];
-              final target = '$base/${item['path']}';
-              final selected = location.startsWith(target);
+              final item = _petStoreMenuItems[i];
+              final targetPage = item['page'] as PartnerPage;
+
+              // UPDATED: Use currentPage property for selection
+              final selected = currentPage == targetPage;
+
               return Material(
                 color: selected ? primary.withOpacity(0.9) : Colors.transparent,
                 child: InkWell(
                   onTap: () {
                     if (Scaffold.of(context).isDrawerOpen) Navigator.of(context).pop();
-                    context.go(target);
+
+                    // 🚀 REPLACED context.go(target) with pushReplacement
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (ctx) => PetStorePartnerShell(
+                          serviceId: serviceId,
+                          currentPage: targetPage,
+                          child: _getPetStoreChildWidget(targetPage, serviceId),
+                        ),
+                      ),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -240,6 +284,10 @@ class _SidebarContent extends StatelessWidget {
             },
           ),
         ),
+
+        // ... (User info and Sign Out buttons remain the same,
+        // using the unchanged provider logic)
+
         if (me != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
@@ -262,7 +310,7 @@ class _SidebarContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${me.name}',
+                        me.name,
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -281,8 +329,6 @@ class _SidebarContent extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height:0),
-
-
                     ],
                   ),
                 ),
@@ -299,7 +345,7 @@ class _SidebarContent extends StatelessWidget {
                 SizedBox(
                   width: 150, // Width for the UID text (adjust based on your requirement)
                   child: Text(
-                    'User ID: ${(me.uid.length) > 15 ? '${(me.uid).substring(0, 15)}...' : (me.uid ?? '')}', // Added prefix "User ID: "
+                    'User ID: ${me.uid.length > 15 ? '${me.uid.substring(0, 15)}...' : me.uid}',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
@@ -311,8 +357,7 @@ class _SidebarContent extends StatelessWidget {
                 IconButton(
                   icon: Icon(Icons.copy, color: Colors.grey[600], size: 13),
                   onPressed: () {
-                    // Copy the UID to the clipboard
-                    Clipboard.setData(ClipboardData(text: me.uid ?? ''))
+                    Clipboard.setData(ClipboardData(text: me.uid))
                         .then((_) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('User ID copied to clipboard!')),

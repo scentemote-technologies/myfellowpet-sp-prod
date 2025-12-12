@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../screens/Boarding/boarding_service_page_detail.dart';
-import '../screens/PetTraining/fcm_token_manager.dart';
+import '../tools/fcm_token_manager.dart';
 
 
 class BoardingDetailsLoader extends StatefulWidget {

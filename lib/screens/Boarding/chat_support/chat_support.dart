@@ -6,10 +6,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../../Widgets/reusable_splash_screen.dart';
+import '../../Partner/email_signin.dart';
 import 'SpGeneralQueryChatbot.dart';
 
 enum SearchMode { orderId, name, number }
@@ -462,8 +463,10 @@ class _SPChatPageState extends State<SPChatPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            // Use context.go() to navigate back to the main chat page route
-            context.go('/partner/${widget.serviceId}/support');
+            _ChatPageLoader(
+              serviceId: widget.serviceId,
+              ticketId: null, // No ticket on this route
+            );
           },
         ),
       ),
@@ -621,9 +624,14 @@ class _SPChatPageState extends State<SPChatPage> {
                               subtitle: Text('$orderId | $phone', style: GoogleFonts.poppins(color: Colors.black54)),
                               trailing: const Icon(Icons.arrow_forward_ios),
                               onTap: () {
-                                // Navigate directly to the new chat ticket
-                                context.go('/partner/${widget.serviceId}/support/ticket/$orderId');
-                              },
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => _ChatPageLoader(
+                                      serviceId: widget.serviceId,
+                                      ticketId: orderId, // Assuming tid is the $orderId or a similar unique ID
+                                    ),
+                                  ),
+                                );                              },
                             ),
                           );
                         },
@@ -895,8 +903,10 @@ class _SPChatPageState extends State<SPChatPage> {
                       subtitle: Text('$orderId | $phone', style: GoogleFonts.poppins(color: Colors.black54)),
                       trailing: const Icon(Icons.arrow_forward_ios),
                       onTap: () {
-                        context.go('/partner/${widget.serviceId}/support/ticket/$orderId');
-                      },
+                        _ChatPageLoader(
+                          serviceId: widget.serviceId,
+                          ticketId: null, // No ticket on this route
+                        );                      },
                     ),
                   );
                 },
@@ -1368,9 +1378,10 @@ class _SPChatPageState extends State<SPChatPage> {
                                   }
                                   final ticketId = doc.id;
                                   print("   → Navigating to /partner/${widget.serviceId}/support/ticket/$ticketId");
-                                  context.go(
-                                      '/partner/${widget.serviceId}/support/ticket/$ticketId');
-                                },
+                                  _ChatPageLoader(
+                                    serviceId: widget.serviceId,
+                                    ticketId: null, // No ticket on this route
+                                  );                                },
                               ),
                             ),
                             if (!isClosed) // Only show the LIVE indicator if not closed
@@ -1615,5 +1626,90 @@ class _SPChatPageState extends State<SPChatPage> {
     if (snap.docs.length < 2) return null;
 
     return snap.docs[1].data()['payload']?.toString();
+  }
+}
+
+
+class _ChatPageLoader extends StatefulWidget {
+  final String serviceId;
+  final String? ticketId;
+
+  const _ChatPageLoader({
+    Key? key,
+    required this.serviceId,
+    this.ticketId,
+  }) : super(key: key);
+
+  @override
+  State<_ChatPageLoader> createState() => _ChatPageLoaderState();
+}
+
+class _ChatPageLoaderState extends State<_ChatPageLoader> {
+  late Future<Widget> _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _loadChatPage(widget.serviceId, widget.ticketId);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatPageLoader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.serviceId != widget.serviceId || oldWidget.ticketId != widget.ticketId) {
+      setState(() {
+        _loadFuture = _loadChatPage(widget.serviceId, widget.ticketId);
+      });
+    }
+  }
+
+  Future<Widget> _loadChatPage(String serviceId, String? ticketId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return SignInPage(); // Protected by router, but good fallback
+    }
+
+    // Fetch the service provider's document
+    final snap = await FirebaseFirestore.instance
+        .collection('users-sp-boarding')
+        .where('service_id', isEqualTo: serviceId)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) {
+      return const Center(child: Text("Error: Service provider profile not found."));
+    }
+
+    final d = snap.docs.first.data();
+
+    // Extract the required fields (using the same fields as your _PartnerLoader)
+    final shopName = d['shop_name'] as String? ?? '';
+    final shopEmail = d['notification_email'] as String? ?? '';
+    final shopPhone = d['dashboard_phone'] as String? ?? '';
+
+    // Return the fully-formed SPChatPage
+    return SPChatPage(
+      initialOrderId: ticketId,
+      serviceId: serviceId,
+      shop_name: shopName,
+      shop_email: shopEmail,
+      shop_phone_number: shopPhone,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Widget>(
+      future: _loadFuture,
+      builder: (ctx, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const ReusableSplashScreen();
+        }
+        if (snap.hasError) {
+          return Center(child: Text("Error loading chat: ${snap.error}"));
+        }
+        return snap.data!;
+      },
+    );
   }
 }

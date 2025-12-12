@@ -192,5 +192,18 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 <script src="flutter_bootstrap.js" defer></script>
 
+<!-- 🔒 BLOCK BROWSER BACK / FORWARD -->
+<script>
+  (function () {
+    // Replace initial history entry
+    history.replaceState(null, "", location.href);
+
+    window.addEventListener("popstate", function () {
+      // Neutralize back & forward buttons
+      history.pushState(null, "", location.href);
+    });
+  })();
+</script>
+
 </body>
 </html>
