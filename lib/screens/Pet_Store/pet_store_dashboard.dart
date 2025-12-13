@@ -13,7 +13,6 @@ import 'package:provider/provider.dart';
 import '../../Colors/AppColor.dart';
 import '../../Widgets/reusable_splash_screen.dart';
 import '../../helper.dart';
-import '../../user_app/screens/Boarding/boarding_servicedetailspage.dart';
 import '../Boarding/OtherBranchesPage.dart';
 import '../Boarding/edit_service_info/edit_service_page.dart';
 import '../Boarding/partner_shell.dart';
@@ -1778,17 +1777,7 @@ class _PetStoreDashboardState extends State<PetStoreDashboard> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: BoardingServiceDetailPage(
-          documentId: widget.serviceId,
-          shopName: widget.shopName,
-          shopImage: widget.shopLogo,
-          areaName: widget.areaName,
-          distanceKm: 0.0,
-          pets: ['s'],
-          mode: '1',
-          // --- This will now be empty, which is expected for this preview ---
-          rates: {}, isOfferActive: true, preCalculatedStandardPrices: {}, preCalculatedOfferPrices: {}, otherBranches: [], isCertified: true,
-        ),
+          child: SizedBox()
       ),
     );
   }

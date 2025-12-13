@@ -17,7 +17,6 @@ import 'package:provider/provider.dart';
 import '../../Colors/AppColor.dart';
 import '../../Widgets/reusable_splash_screen.dart';
 import '../../helper.dart';
-import '../../user_app/screens/Boarding/boarding_servicedetailspage.dart';
 import '../Partner/email_signin.dart' hide primaryColor;
 import 'OtherBranchesPage.dart';
 import 'edit_service_info/edit_service_page.dart';
@@ -2202,17 +2201,7 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: BoardingServiceDetailPage(
-          documentId: widget.serviceId,
-          shopName: widget.shopName,
-          shopImage: widget.shopLogo,
-          areaName: widget.areaName,
-          distanceKm: 0.0,
-          pets: widget.pets,
-          mode: '1',
-          // --- This will now be empty, which is expected for this preview ---
-          rates: {}, isOfferActive: true, preCalculatedStandardPrices: {}, preCalculatedOfferPrices: {}, otherBranches: [], isCertified: true,
-        ),
+        child: SizedBox()
       ),
     );
   }
