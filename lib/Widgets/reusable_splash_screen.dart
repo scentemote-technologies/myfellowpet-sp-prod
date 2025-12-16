@@ -60,7 +60,7 @@ class _ReusableSplashScreenState extends State<ReusableSplashScreen> {
             // **FIX: Simplified Lottie.asset**
             Lottie.asset(
               // **CRITICAL: Verify this asset path is correct and matches pubspec.yaml**
-              '/assets/animations/Loading.json',
+              '/assets/assets/animations/Loading.json',
               // Removed: controller: _controller,
               height: isMobile ? 180 : 250,
               width: isMobile ? 180 : 250,
