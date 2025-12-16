@@ -66,13 +66,14 @@ import '../../services/places_service.dart';
       final String email;
       final String runType;
       final String serviceId;
+      final bool fromOtherbranches;
 
       const Homeboarderonboardpage({
         Key? key,
         required this.uid,
         required this.phone,
         required this.runType,
-        required this.serviceId, required this.email,
+        required this.serviceId, required this.email, required this.fromOtherbranches,
       }) : super(key: key);
 
       @override
@@ -886,24 +887,43 @@ import '../../services/places_service.dart';
           _shopNameErrorText = null;
         });
 
-        // For a case-insensitive search, we query a normalized, all-lowercase field.
-        // This is the most efficient way to perform this check in Firestore.
+        // 1. Setup: Get normalized name and the ID of the parent service (if branching).
         final normalizedName = name.trim().toLowerCase();
+        final parentServiceId = widget.serviceId; // Get the ID of the service being branched from.
 
-        // Build the efficient query
+        // Build the efficient query: find any 'Home Run' with the exact same normalized name.
         final query = await FirebaseFirestore.instance
             .collection('users-sp-boarding')
-            .where('type', isEqualTo: 'Home Run') // 👈 FIRST condition: Only check "Home Run" types
-            .where('shop_name_lowercase', isEqualTo: normalizedName) // 👈 SECOND condition: Case-insensitive check
-            .limit(1) // 👈 crucial for efficiency: stops after finding one match
+            .where('type', isEqualTo: 'Home Run')
+            .where('shop_name_lowercase', isEqualTo: normalizedName)
+            .limit(1) // Stop as soon as a potential duplicate is found.
             .get();
 
         if (!mounted) return;
 
+        bool isDuplicateFound = false;
+
+        // 2. Determine if a blockable duplicate exists.
+        if (query.docs.isNotEmpty) {
+          final foundDocId = query.docs.first.id;
+
+          // This is the core logic:
+          // If we are branching (parentServiceId is NOT empty) AND
+          // the name we are checking matches the name of the parent document,
+          // we allow it, as it's the expected behavior for a branch.
+          if (parentServiceId.isNotEmpty && foundDocId == parentServiceId) {
+            isDuplicateFound = false; // Name is the same as the parent's, which is okay.
+          } else {
+            // If the found document is NOT the parent (or if we are doing a fresh start
+            // and a match was found), it's a true duplicate error.
+            isDuplicateFound = true;
+          }
+        }
+
         // Update the UI with the result
         setState(() {
-          _shopNameErrorText = query.docs.isNotEmpty
-              ? 'This brand name is already in use.'
+          _shopNameErrorText = isDuplicateFound
+              ? 'This brand name is already in use by another service.'
               : null;
           _isCheckingShopName = false;
         });
@@ -1334,6 +1354,8 @@ import '../../services/places_service.dart';
                       controller: _shopNameCtrl,
                       label: "Brand Name*",
                       icon: Icons.store_outlined,
+                      // If serviceId exists (branching), it should be read-only
+                      readOnly: widget.serviceId.isNotEmpty,
                       // These new properties enable real-time validation
                       onChanged: (value) => _shopNameDebouncer.run(() => _validateShopName(value)),
                       errorText: _shopNameErrorText,
@@ -1523,6 +1545,7 @@ import '../../services/places_service.dart';
       void initState() {
         super.initState();
         _loadPetTypesAndConfigs(); // <-- Use a new combined function
+        _loadParentShopName(); // <--- ADD THIS LINE
 
 
         _fetchFeatureLimit(); // <-- ADD THIS LINE
@@ -1532,6 +1555,32 @@ import '../../services/places_service.dart';
 
         apiKey = const String.fromEnvironment('PLACES_API_KEY', defaultValue: '');
         _places = PlacesService(apiKey);
+      }
+      // V V V ADD THIS NEW METHOD V V V
+      Future<void> _loadParentShopName() async {
+        final parentServiceId = widget.serviceId;
+
+        // Check if we are in a branching scenario
+        if (parentServiceId.isNotEmpty) {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('users-sp-boarding')
+                .doc(parentServiceId)
+                .get();
+
+            if (doc.exists && doc.data() != null) {
+              final parentShopName = doc.data()!['shop_name'] as String?;
+              if (parentShopName != null && mounted) {
+                setState(() {
+                  // Pre-fill the controller with the parent's shop name
+                  _shopNameCtrl.text = parentShopName;
+                });
+              }
+            }
+          } catch (e) {
+            print("Error loading parent shop name: $e");
+          }
+        }
       }
 
       // lib/screens/ShopDetailsPage.dart -> in _HomeboarderonboardpageState
@@ -2903,10 +2952,13 @@ import '../../services/places_service.dart';
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ✅ THIS IS THE CORRECTED WIDGET FOR DESKTOP
+                        // ✅ MODIFIED LINE: Added 'readOnly' property
                         _buildTextFormField(
                           controller: _shopNameCtrl,
                           label: "Brand Name*",
                           icon: Icons.store_outlined,
+                          // If serviceId exists (branching), it should be read-only
+                          readOnly: widget.serviceId.isNotEmpty,
                           onChanged: (value) => _shopNameDebouncer.run(() => _validateShopName(value)),
                           errorText: _shopNameErrorText,
                           suffixIcon: _isCheckingShopName ? const CircularProgressIndicator(strokeWidth: 2) : null,
@@ -2956,6 +3008,7 @@ import '../../services/places_service.dart';
                     controller: _shopNameCtrl,
                     label: "Brand Name*",
                     icon: Icons.store_outlined,
+                    readOnly: widget.serviceId.isNotEmpty,
                     onChanged: (value) => _shopNameDebouncer.run(() => _validateShopName(value)),
                     errorText: _shopNameErrorText,
                     suffixIcon: _isCheckingShopName ? const CircularProgressIndicator(strokeWidth: 2) : null,

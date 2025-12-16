@@ -277,6 +277,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => RunTypeSelectionPage(
+                fromOtherbranches:false,
                 // Assuming this page requires user/auth details
                 uid: FirebaseAuth.instance.currentUser!.uid,
                 phone: FirebaseAuth.instance.currentUser!.phoneNumber ?? '',

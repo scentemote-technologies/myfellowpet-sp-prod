@@ -104,10 +104,11 @@ class _OtherBranchesPageState extends State<OtherBranchesPage> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => RunTypeSelectionPage(
+                
                 uid: FirebaseAuth.instance.currentUser!.uid,
                 phone: FirebaseAuth.instance.currentUser!.phoneNumber ?? '',
                 email: FirebaseAuth.instance.currentUser!.email ?? '',
-                serviceId: widget.serviceId, // Pass the existing serviceId
+                serviceId: widget.serviceId, fromOtherbranches: true, // Pass the existing serviceId
               ),
             ),
           );

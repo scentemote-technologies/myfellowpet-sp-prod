@@ -9,15 +9,17 @@ import 'ShopDetailsPage.dart'; // Keep if needed
 class RunTypeSelectionPage extends StatelessWidget {
   final String uid;
   final String phone;
+  final bool fromOtherbranches;
   final String email;
   final String? serviceId;
+  final String? shopName;
 
   const RunTypeSelectionPage({
     Key? key,
     required this.uid,
     required this.phone,
     this.serviceId,
-    required this.email,
+    required this.email, required this.fromOtherbranches, this.shopName,
   }) : super(key: key);
 
   static const Color primaryColor = Color(0xFF00838F); // A deeper teal
@@ -52,6 +54,7 @@ class RunTypeSelectionPage extends StatelessWidget {
                     _getIcon(data['icon'] ?? 'home'),
                     doc.id == 'home_boarding'
                         ? Homeboarderonboardpage(
+                      fromOtherbranches:fromOtherbranches,
                       uid: uid,
                       phone: phone,
                       email: email,

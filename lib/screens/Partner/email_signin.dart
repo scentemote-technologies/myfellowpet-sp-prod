@@ -97,6 +97,7 @@ class _SignInPageState extends State<SignInPage> {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (ctx) => RunTypeSelectionPage(
+            fromOtherbranches: false,
             uid: currentUser.uid,
             phone: currentUser.phoneNumber ?? '',
             email: currentUser.email ?? '',
