@@ -315,7 +315,7 @@ import '../../services/places_service.dart';
         setState(() => _isSendingPhoneOtp = true);
         try {
           // Note: We use the same 'sendSms' cloud function
-          final callable = FirebaseFunctions.instance.httpsCallable('sendTestSms');
+          final callable = FirebaseFunctions.instance.httpsCallable('sendSms');
 
           // Use the same generated doc ID as the email verification
           _generatedDocIdForSubmission ??= FirebaseFirestore.instance.collection('users-sp-boarding').doc().id;
@@ -407,7 +407,7 @@ import '../../services/places_service.dart';
 
         setState(() => _isSendingWhatsappOtp = true);
         try {
-          final callable = FirebaseFunctions.instance.httpsCallable('sendTestSms');
+          final callable = FirebaseFunctions.instance.httpsCallable('sendSms');
           _generatedDocIdForSubmission ??= FirebaseFirestore.instance.collection('users-sp-boarding').doc().id;
 
           final result = await callable.call({
