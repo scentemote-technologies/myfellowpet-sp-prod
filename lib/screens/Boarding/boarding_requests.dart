@@ -934,13 +934,13 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
               children: [
 
                 // ============= USER BILL SECTION =============
-                _sectionHeader("WHAT THE USER PAID"),
+                _sectionHeader("PAYMENT DETAILS"),
                 _ledgerRow("Service Fee", serviceExcGst),
                 if (gstRegistered)
                   _ledgerRow("GST on Service Fee ${pct(serviceExcGst, gstOnService)}", gstOnService),
 
                 if (checkoutEnabled) ...[
-                  _ledgerRow("Platform Fee (charged to user)", platformExcGst),
+                  _ledgerRow("Platform Fee (charged to user if applicable)", platformExcGst),
                   _ledgerRow(
                       "GST on Platform Fee ${pct(platformExcGst, gstOnPlatform)}",
                       gstOnPlatform),
@@ -1005,7 +1005,7 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
 
 
                 Text(
-                  "This is the exact amount you earn for this booking.",
+                  "This reflects your earnings for this booking.",
                   style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
                 ),
 
@@ -1268,36 +1268,45 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch for full-width buttons
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+
               // --- Header & Title ---
               Icon(Icons.star_half_rounded, color: primaryColor, size: 48),
               const SizedBox(height: 16),
               Text(
-                'Finalize & Rate Service',
+                'Finalize & Rate Booking',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Please provide a rating for this service before completion.',
+                'Please rate your experience with this booking before marking it complete.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade600),
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
               ),
               const SizedBox(height: 24),
 
-              // --- Rating Stars (Stateful) ---
+              // --- Rating Stars ---
               StatefulBuilder(builder: (ctx2, setState2) {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (i) {
                     return IconButton(
                       icon: Icon(
-                          i < rating
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          color: Colors.amber,
-                          size: 38), // Slightly larger stars
+                        i < rating
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: Colors.amber,
+                        size: 38,
+                      ),
                       onPressed: () => setState2(() => rating = i + 1),
                     );
                   }),
@@ -1309,15 +1318,17 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
               TextField(
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Remarks (optional) - How was the service?',
+                  hintText: 'Remarks (optional) – Notes about this booking',
                   hintStyle: GoogleFonts.poppins(color: Colors.grey.shade400),
                   contentPadding: const EdgeInsets.all(16),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12), // Rounded border
-                      borderSide: BorderSide(color: Colors.grey.shade300)),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
                   focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2)),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 2),
+                  ),
                 ),
                 onChanged: (v) => remarks = v,
                 style: GoogleFonts.poppins(fontSize: 15),
@@ -1333,10 +1344,15 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.black87,
                         side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: Text('Cancel', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1346,11 +1362,16 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         elevation: 2,
                       ),
-                      child: Text('Submit & Complete', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Submit & Complete',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -1359,6 +1380,7 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
           ),
         ),
       ),
+
     );
 
     if (confirmed != true) return;
