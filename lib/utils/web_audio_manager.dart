@@ -19,7 +19,7 @@ void initWebAudio() {
       // 2. Create the Audio Element
       audio = html.AudioElement();
       audio.id = _AUDIO_ELEMENT_ID;
-      audio.src = 'assets/booking_alert.mp3'; // Note: Flutter asset path format for web
+      audio.src = '/assets/booking_alert.mp3';
       audio.loop = true; // Loop the sound for persistence
       audio.preload = 'auto'; // Load the file immediately
 
