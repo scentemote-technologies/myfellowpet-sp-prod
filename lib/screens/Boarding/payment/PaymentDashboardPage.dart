@@ -34,9 +34,9 @@ class _PaymentDashboardPageState extends State<PaymentDashboardPage> {
   String? _error;
 
   // Aggregates
-  double totalBookedInclGst = 0;      // sum(cost_breakdown.total_amount)
-  double platformFeePlusGst = 0;      // sum(cost_breakdown.platform_fee_plus_gst)
-  double spServiceFee = 0;            // sum(cost_breakdown.sp_service_fee)
+  double totalBookedInclGst = 0;
+  double platformFeePlusGst = 0;
+  double spServiceFee = 0;
   double payoutsDone = 0;             // completed_orders where payout_done==true, sum(sp_service_fee)
   double payoutsPending = 0;          // completed_orders where payout_done==false, sum(sp_service_fee)
   double refundsInclGst = 0;          // sum(sp_cancellation_history.net_refund_including_gst)

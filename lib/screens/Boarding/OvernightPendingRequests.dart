@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../Colors/AppColor.dart';
 import '../../Colors/AppColor.dart' as AppColor;
 import '../../shared/highlight_mode.dart';
+import '../../utils/web_audio_manager.dart';
 import 'boarding_requests.dart';
 import 'chat_support/ChatScreen.dart';
 import 'chat_support/chat_support.dart';
@@ -348,7 +349,6 @@ Future<void> handleCancel(
 
   if (selection == null) return;
 
-  final cb = data['cost_breakdown'] as Map<String, dynamic>? ?? {};
 
   final adminPct = int.tryParse(
       settingsDoc.data()?['admin_cancel_fee_percentage']?.toString() ?? '0') ??
@@ -910,15 +910,6 @@ void showCancellationInvoiceDialog({
                                     });
                                   });
 
-                                  // 2️⃣ Recompute adjusted amounts, update booking
-                                  final cb = raw['cost_breakdown'] as Map<String, dynamic>? ?? {};
-                                  final double originalSpFee =
-                                      double.tryParse(cb['sp_service_fee']?.toString() ?? '0') ?? 0.0;
-                                  final double originalSpGst =
-                                      double.tryParse(cb['sp_service_gst_fee']?.toString() ?? '0') ?? 0.0;
-                                  final double originalTotal =
-                                      double.tryParse(cb['total_amount']?.toString() ?? '0') ?? 0.0;
-                                  final double adjustedTotal = originalTotal - computedGross;
 
                                   final settingsSnap = await firestore
                                       .collection('company_documents')
@@ -931,16 +922,11 @@ void showCancellationInvoiceDialog({
                                   final gstFraction = parsed > 1 ? parsed / 100.0 : parsed;
 
                                   final gstRefund = refundableBase * gstFraction;
-                                  final adjustedSpFee = (originalSpFee - computedGross).clamp(0, double.infinity);
-                                  final adjustedSpGst = (originalSpGst - gstRefund).clamp(0, double.infinity);
                                   final netRefundWithGst = netRefund + gstRefund;
 
                                   final updates = <String, dynamic>{
                                     'refund_amount': netRefundWithGst,
                                     'cancellation_requested_at': nowTs,
-                                    'cost_breakdown.sp_service_fee': adjustedSpFee,
-                                    'cost_breakdown.sp_service_gst_fee': adjustedSpGst,
-                                    'cost_breakdown.sp_total_with_gst': adjustedSpFee + adjustedSpGst,
                                   };
 
                                   for (final d in dates) {
@@ -1059,6 +1045,7 @@ class _OvernightPendingRequestsState extends State<OvernightPendingRequests>
   final TextEditingController _searchController = TextEditingController();
   String searchQuery = '';
   StreamSubscription<DocumentSnapshot>? _verificationSub;
+  int? _lastPendingOrderCount;
 
 
   // --- UPDATED: Filter state variables ---
@@ -1715,6 +1702,8 @@ class _OvernightPendingRequestsState extends State<OvernightPendingRequests>
 
               // 🟢 3. ADD PRINT HERE TO CHECK DOCUMENT COUNT
               if (!snap.hasData || snap.data!.docs.isEmpty) {
+                stopCriticalAlertSound();
+                _lastPendingOrderCount = 0;
                 print("⚠️ Stream has data but list is EMPTY. Docs count: 0");
                 return const Center(child: Text('No pending orders found.'));
               }
@@ -1757,6 +1746,21 @@ class _OvernightPendingRequestsState extends State<OvernightPendingRequests>
                 return searchQuery.isEmpty ||
                     d.id.toLowerCase().contains(searchQuery.toLowerCase());
               });
+
+              // 2. CHECK FOR NEW UNCONFIRMED ORDERS
+              final currentPendingCount = rawDocs.length;
+
+              // Check if we detected an increase in unconfirmed orders
+              if (_lastPendingOrderCount != null &&
+                  currentPendingCount > _lastPendingOrderCount! &&
+                  currentPendingCount > 0)
+              {
+                // 🚨 NEW ORDER DETECTED: START LOUD ALERT
+                // This function should be defined in web_audio_manager.dart
+                playCriticalAlertSound();
+              }
+
+              _lastPendingOrderCount = currentPendingCount;
 
               if (rawDocs.isEmpty) {
                 return Center(
@@ -2147,17 +2151,19 @@ class PendingBoardingRequestCard extends StatelessWidget {
                     'Accept',
                     Icons.check,
                     Colors.green,
-                        () => doc.reference.update({
-                      'sp_confirmation': true,
-                    }),
+                        () {
+                      // 1. STOP LOUD ALERT WHEN SP CLICKS ACCEPT
+                      stopCriticalAlertSound();
+                      doc.reference.update({'sp_confirmation': true,});
+                    },
                   ),
-                  // ✅ MODIFIED: Simple update to 'rejected' status in place
-                  // MODIFIED REJECT BUTTON:
                   _styledButton(
                     'Reject',
                     Icons.close,
                     Colors.red,
                         () {
+                      // 2. STOP LOUD ALERT WHEN SP CLICKS REJECT
+                      stopCriticalAlertSound();
                       if (onReject != null) {
                         onReject!();
                       } else {
@@ -2371,7 +2377,7 @@ class PendingBoardingRequestCard extends StatelessWidget {
     // Fallback to old 'sp_service_fee' if the new field is missing (for older bookings).
     final earnings = data['sp_service_fee_exc_gst'] as double? ??
         data['sp_service_fee_inc_gst'] as double? ?? // Fallback 2: Try Inc GST
-        data['sp_service_fee'] as double? ?? // Fallback 3: Old cost_breakdown field
+        data['sp_service_fee'] as double? ??
         0.0;
 
     final isConfirmed = data['sp_confirmation'] == true;

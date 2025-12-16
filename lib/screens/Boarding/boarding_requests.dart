@@ -2127,13 +2127,6 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
       return petIds.where((id) => !cancelled.contains(id)).toList();
     }
 
-    // Cost breakdown (unchanged) …
-    final breakdown = data['cost_breakdown'] as Map<String, dynamic>? ?? {};
-    final totalCostWithGst =
-        double.tryParse(breakdown['total_amount']?.toString() ?? '') ?? 0.0;
-    final platformFee =
-        double.tryParse(breakdown['platform_fee_plus_gst']?.toString() ?? '') ?? 0.0;
-    final totalCost = totalCostWithGst - platformFee;
 
     // Today's date for highlighting
     final today = DateTime.now();
@@ -2170,7 +2163,7 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
     final state = (context).findAncestorStateOfType<_ConfirmedRequestsState>();
     final earnings = data['sp_service_fee_exc_gst'] as double? ??
         data['sp_service_fee_inc_gst'] as double? ?? // Fallback 2: Try Inc GST
-        data['sp_service_fee'] as double? ?? // Fallback 3: Old cost_breakdown field
+        data['sp_service_fee'] as double? ??
         0.0;
 
 

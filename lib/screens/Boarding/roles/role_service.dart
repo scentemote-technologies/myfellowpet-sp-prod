@@ -42,6 +42,8 @@ class UserNotifier extends ChangeNotifier {
   AuthState _authState = AuthState.initializing;
   AuthState get authState => _authState;
 
+  String? get activeServiceId => _me?.serviceId;
+
   List<AppUser> _ownerProfiles = [];
   List<AppUser> get ownerProfiles => _ownerProfiles;
 

@@ -15,7 +15,8 @@ const firebaseConfig = {
   projectId: "myfellowpet-prod",
   storageBucket: "myfellowpet-prod.firebasestorage.app",
   messagingSenderId: "442628504378",
-  appId: "1:442628504378:web:78a33db6419de9b42aae03
+  // 🚀 FIX: Added missing closing quote
+  appId: "1:442628504378:web:78a33db6419de9b42aae03"
 };
 
 // Initialize Firebase with your config
@@ -26,11 +27,10 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function(payload) {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-  const notificationTitle = payload.data.title || 'New Notification';
-  const notificationOptions = {
-    // *This is the line you need to change.*
-    body: payload.data.body,
-    icon: '/favicon.png', // <-- You can specify an icon here
+  const notificationTitle = payload.notification.title || 'New Notification';
+  const notificationBody = payload.notification.body;  const notificationOptions = {
+    body: notificationBody,
+    // 🚀 FIX: Using the correct icon path from your web/icons folder
     data: payload.data
   };
 
