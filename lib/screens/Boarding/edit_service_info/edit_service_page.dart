@@ -27,6 +27,7 @@ import '../../../providers/boarding_details_loader.dart';
 import '../../../services/places_service.dart';
 import '../boarding_service_page_detail.dart';
 import '../edit_history_page.dart';
+import '../partner_shell.dart';
 import '../roles/role_service.dart';
 
 // --- NEW DATA MODEL FOR PRICING CONTROLLERS ---
@@ -460,15 +461,22 @@ class _EditServicePageState extends State<EditServicePage> {
       for (final doc in snapshot.docs) {
         final petKey = doc.id;
         final data = doc.data();
-        final List<String> sizes = List<String>.from(data['sizes'] ?? []);
-        sizeConfigs[petKey] = sizes;
+
+        // 1. Get ALL possible sizes from the global configuration fetched earlier
+        // If global config is missing for some reason, fall back to the saved sizes
+        final globalConfig = _globalPetConfigs[petKey];
+        final List<String> allPossibleSizes = globalConfig != null
+            ? List<String>.from(globalConfig['sizes'] ?? [])
+            : List<String>.from(data['sizes'] ?? []);
+
+        // Store all possible sizes so the UI builds fields for every one of them
+        sizeConfigs[petKey] = allPossibleSizes;
 
         // --- 🔽 ADDITION: Fetches the currently saved varieties ---
         final details = {
           'sizes': List<String>.from(data['accepted_sizes'] ?? []),
           'breeds': List<String>.from(data['accepted_breeds'] ?? []),
         };
-        // Store two copies: one for editing, and an initial one to compare against for changes.
         _initialSelectedPetDetails[petKey] = Map.from(details);
         _selectedPetDetails[petKey] = details;
         // --- 🔼 END OF ADDITION ---
@@ -488,7 +496,7 @@ class _EditServicePageState extends State<EditServicePage> {
               );
             }
             if (fieldName.contains('image')) {
-              return MapEntry(fieldName, value as String? ?? ''); // Keep URL as a String
+              return MapEntry(fieldName, value as String? ?? '');
             }
             return MapEntry(fieldName, TextEditingController(text: value.toString()));
           });
@@ -504,8 +512,13 @@ class _EditServicePageState extends State<EditServicePage> {
           'feeding_details': feedingDetailsData,
         };
 
+        // 2. Updated: Create controllers for EVERY possible size.
+        // If the rate is missing in Firestore, it defaults to an empty string (showing the field in UI).
         Map<String, TextEditingController> createRateControllers(Map<String, String> rates) {
-          return { for (var size in sizes) size: TextEditingController(text: rates[size] ?? '') };
+          return {
+            for (var size in allPossibleSizes)
+              size: TextEditingController(text: rates[size] ?? '')
+          };
         }
 
         pricingControllers[petKey] = PetPricingControllers(
@@ -1042,11 +1055,17 @@ class _EditServicePageState extends State<EditServicePage> {
 
       if (mounted) {
         await Provider.of<UserNotifier>(context, listen: false).refreshUserProfile();
-        Navigator.of(context).push(
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => BoardingDetailsLoader(serviceId: widget.serviceId), // Use 'const' if possible
+            builder: (ctx) => PartnerShell(
+              serviceId: widget.serviceId,
+              // We are navigating to the main profile/overview page of the new branch
+              currentPage: PartnerPage.profile,
+              child: BoardingDetailsLoader(serviceId: widget.serviceId),
+            ),
           ),
-        );      }
+        );
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred: $e')));
     } finally {
@@ -1331,8 +1350,14 @@ class _EditServicePageState extends State<EditServicePage> {
           children: sizes.map((sz) {
             return ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 150),
-              child: _buildField('$sz Rate', controllers[sz]!, icon: Icons.currency_rupee),
-            );
+// Inside _buildRateFields
+              child: _buildField(
+                '$sz Rate',
+                controllers[sz]!,
+                icon: Icons.currency_rupee,
+                // Add a hint so if the text is empty, the user sees '0'
+                hintText: '0',
+              ),            );
           }).toList(),
         ),
       ],
@@ -1842,15 +1867,23 @@ class _EditServicePageState extends State<EditServicePage> {
   }
 // REPLACE WITH THIS
   Widget _buildField(String label, TextEditingController ctrl,
-      {IconData? icon, bool readOnly = false, Widget? suffix, int? maxLines = 1, bool isRequired = true}) { // Added isRequired flag
+      {IconData? icon,
+        bool readOnly = false,
+        Widget? suffix,
+        int? maxLines = 1,
+        bool isRequired = true,
+        String? hintText}) { // Added hintText parameter
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
         controller: ctrl,
         maxLines: maxLines,
+        readOnly: readOnly, // Ensure readOnly is actually applied
         style: GoogleFonts.poppins(color: Colors.black87),
         decoration: InputDecoration(
             labelText: label,
+            hintText: hintText, // Use the hintText here
+            hintStyle: GoogleFonts.poppins(color: Colors.grey.shade400, fontSize: 14),
             labelStyle: GoogleFonts.poppins(color: Colors.grey.shade700),
             filled: true,
             fillColor: Colors.grey.shade50,
@@ -1864,8 +1897,8 @@ class _EditServicePageState extends State<EditServicePage> {
             ),
             prefixIcon: icon != null ? Icon(icon, color: Colors.grey.shade600) : null,
             suffixIcon: suffix),
-        // This validator is now conditional based on the isRequired flag
-        validator: isRequired ? (v) => (v == null || v.isEmpty ? 'Required' : null) : null,
+        // Set isRequired to false when calling this for Pricing so users can see '0'
+        validator: isRequired ? (v) => (v == null || v.trim().isEmpty ? 'Required' : null) : null,
       ),
     );
   }

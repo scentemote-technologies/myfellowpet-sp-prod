@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import '../../Colors/AppColor.dart';
 import '../../Widgets/reusable_splash_screen.dart';
 import '../../helper.dart';
+import '../../service_provider_subscription_plans.dart';
 import '../../user_app_boarding_detail_page.dart';
 import '../Partner/email_signin.dart' hide primaryColor;
 import 'OtherBranchesPage.dart';
@@ -1730,6 +1731,9 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
 
               const SizedBox(width: 12),
 
+
+
+
               /// Branches button (only for Owner)
               // Branches button (only for Owner)
               if (me?.role == 'Owner')
@@ -1751,7 +1755,72 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                         ),
                       ),
                 ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+
+              if (me?.role == 'Owner')
+                StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('settings')
+                      .doc('payment')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || !snapshot.data!.exists) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final data = snapshot.data!.data() as Map<String, dynamic>;
+                    final spSubscription = data['sp_subscription'] as Map<String, dynamic>?;
+
+                    final bool homeBoardingEnabled =
+                        spSubscription?['home_boarding'] == true;
+
+                    if (!homeBoardingEnabled) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Row(
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(
+                            Icons.stars_rounded,
+                            color: Colors.black,
+                            size: 18,
+                          ),
+                          label: Text(
+                            "Manage Subscription",
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                            ),
+                          ),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SubscriptionPlansPage(
+                                serviceId: widget.serviceId,
+                              ),
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                            side: const BorderSide(color: Colors.black87),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    );
+                  },
+                ),
+
               _buildStatusIndicator(context),
             ],
           ),

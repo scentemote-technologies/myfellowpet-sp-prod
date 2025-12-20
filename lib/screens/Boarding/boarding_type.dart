@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../Partner/email_signin.dart';
 import '../Pet_Store/PetStoreOnboarding.dart';
 import 'HomeBoarderOnboardPage.dart';
 import 'ShopDetailsPage.dart'; // Keep if needed
@@ -181,6 +183,39 @@ class RunTypeSelectionPage extends StatelessWidget {
               ),
             ),
           ),
+          Positioned(
+            top: 30,
+            right: 10,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () async {
+                  await FirebaseAuth.instance.signOut();
+
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => SignInPage()),
+                        (route) => false, // POP ALL ROUTES
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: Colors.black, width: 1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Sign out',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
         ],
       ),
     );
