@@ -237,8 +237,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     setState(() => isSending = true);
 
                     final url = Uri.parse(
-                        'https://us-central1-petproject-test-g.cloudfunctions.net'
-                            '/emailUpdateService/api/requestEmailChange');
+                        'https://asia-south1-myfellowpet-prod.cloudfunctions.net/emailUpdateService/api/requestEmailChange');
                     final resp = await http.post(
                       url,
                       headers: {'Content-Type': 'application/json'},
@@ -348,8 +347,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ? () async {
                     // finalize
                     final url = Uri.parse(
-                        'https://us-central1-petproject-test-g.cloudfunctions.net'
-                            '/emailUpdateService/api/finalizeEmailChange');
+                        'https://asia-south1-myfellowpet-prod.cloudfunctions.net/emailUpdateService/api/finalizeEmailChange');
                     await http.post(url,
                         headers: {'Content-Type': 'application/json'},
                         body: jsonEncode(

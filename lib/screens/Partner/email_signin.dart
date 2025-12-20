@@ -81,20 +81,17 @@ class _SignInPageState extends State<SignInPage> {
 
   // --- NEW REDIRECTOR LOGIC ---
   void _redirectToAuthenticatedUser(BuildContext context, UserNotifier userNotifier) {
-
-    // Safety check: ensure user is logged in and state has been resolved
     if (userNotifier.authState == AuthState.loading ||
         userNotifier.authState == AuthState.initializing) {
-      // Should not happen, but safe to ignore if still loading
       return;
     }
 
     final authState = userNotifier.authState;
     final User? currentUser = FirebaseAuth.instance.currentUser;
 
+    // Normal navigation (Push) instead of pushAndRemoveUntil
     if (authState == AuthState.onboardingNeeded && currentUser != null) {
-      // Navigate to /business-type
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (ctx) => RunTypeSelectionPage(
             fromOtherbranches: false,
@@ -104,27 +101,22 @@ class _SignInPageState extends State<SignInPage> {
             serviceId: null,
           ),
         ),
-            (route) => false,
       );
       return;
     }
 
     if (authState == AuthState.profileSelectionNeeded) {
-      // Navigate to /profile-selection
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (ctx) => const ProfileSelectionScreen(),
         ),
-            (route) => false,
       );
       return;
     }
 
-    // If authenticated AND we have a serviceId, go directly to the profile
     if (authState == AuthState.authenticated && userNotifier.me?.serviceId != null) {
       final serviceId = userNotifier.me!.serviceId!;
-      // Navigate to /partner/:serviceId/profile
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (ctx) => PartnerShell(
             serviceId: serviceId,
@@ -132,19 +124,15 @@ class _SignInPageState extends State<SignInPage> {
             child: BoardingDetailsLoader(serviceId: serviceId),
           ),
         ),
-            (route) => false,
       );
       return;
     }
 
-    // Fallback: If logged in but somehow missed the checks (e.g., waiting for profile data),
-    // redirect to the Profile Selection screen as the safe hub.
     if (currentUser != null) {
-      Navigator.of(context).pushAndRemoveUntil(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (ctx) => const ProfileSelectionScreen(),
         ),
-            (route) => false,
       );
     }
   }
@@ -212,6 +200,9 @@ class _SignInPageState extends State<SignInPage> {
 
 
   Widget _buildLoginCard() {
+    final User? currentUser = FirebaseAuth.instance.currentUser; // Get current user
+    final userNotifier = Provider.of<UserNotifier>(context); // Access user data
+
     return Container(
       width: 360,
       padding: const EdgeInsets.all(24),
@@ -224,6 +215,7 @@ class _SignInPageState extends State<SignInPage> {
         mainAxisSize: MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // --- Company Logo Section ---
           FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
                 .collection('company_documents')
@@ -244,7 +236,6 @@ class _SignInPageState extends State<SignInPage> {
                 final imageUrl = snapshot.data!['main_image'];
                 return Container(
                   height: 200,
-                  // Assuming imageUrl is String
                   child: Image.network(
                     imageUrl as String,
                     fit: BoxFit.contain,
@@ -255,52 +246,96 @@ class _SignInPageState extends State<SignInPage> {
           ),
 
           const SizedBox(height: 8),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-              children: const <TextSpan>[
-                TextSpan(text: 'Sign in to '),
-                TextSpan(
-                  text: 'Login/Register',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+
+          // --- Conditional UI: Welcome Message vs Sign-In Button ---
+          if (currentUser != null) ...[
+            // Show Welcome Message if signed in
+            Column(
+              children: [
+                Text(
+                  'Welcome',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  '${currentUser.email}',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => _redirectToAuthenticatedUser(context, userNotifier),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: Text(
+                    'Continue to App',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Google Sign-In button
-          OutlinedButton(
-            onPressed: _isLoading ? null : _signInWithGoogle,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              side: const BorderSide(color: primaryColor, width: 2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+          ] else ...[
+            // Show Sign-In option if not signed in
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+                children: const <TextSpan>[
+                  TextSpan(text: 'Sign in to '),
+                  TextSpan(
+                    text: 'Login/Register',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-              textStyle: GoogleFonts.poppins(fontSize: 16),
             ),
-            child: _isLoading
-                ? const SizedBox(
-              height: 24,
-              width: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset('assets/google_logo.png', height: 24.0),
-                const SizedBox(width: 8.0),
-                const Text('Sign in with Google'),
-              ],
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: _isLoading ? null : _signInWithGoogle,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                side: const BorderSide(color: primaryColor, width: 2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                textStyle: GoogleFonts.poppins(fontSize: 16),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+                  : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('assets/google_logo.png', height: 24.0),
+                  const SizedBox(width: 8.0),
+                  const Text('Sign in with Google'),
+                ],
+              ),
             ),
-          ),
+          ],
 
           const SizedBox(height: 16),
 
@@ -315,9 +350,7 @@ class _SignInPageState extends State<SignInPage> {
 
           const SizedBox(height: 16),
 
-
-
-          const SizedBox(height: 16),
+          // --- Contact Us Section ---
           FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
                 .collection('company_documents')
@@ -411,6 +444,25 @@ class _SignInPageState extends State<SignInPage> {
                   _buildFooterLink('Privacy Policy', privacyUrl as String),
                   const Text('|', style: TextStyle(color: Colors.grey)),
                   _buildFooterLink('Cancellation & Refund', cancelUrl as String),
+                  // ADD THIS SECTION:
+                  if (FirebaseAuth.instance.currentUser != null) ...[
+                    const Text('|', style: TextStyle(color: Colors.grey)),
+                    GestureDetector(
+                      onTap: () async {
+                        await FirebaseAuth.instance.signOut();
+                        await GoogleSignIn().signOut();
+                        setState(() {}); // Rebuild to show the sign-in button
+                      },
+                      child: Text(
+                        'Logout',
+                        style: GoogleFonts.poppins(
+                          color: Colors.red.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

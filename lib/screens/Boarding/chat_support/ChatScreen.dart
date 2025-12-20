@@ -1,5 +1,8 @@
 // lib/screens/chat/chat_screen_sp.dart
 
+import 'dart:typed_data';
+import 'dart:convert';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
@@ -8,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import 'chat_helper.dart';
@@ -61,13 +65,30 @@ class _ChatScreenSPState extends State<ChatScreenSP> {
         .listen((snap) {
       final msgs = snap.docs.map((d) {
         final data = d.data();
-        return types.TextMessage(
-          id:        d.id,
-          author:    types.User(id: data['senderId'] as String),
-          text:      data['text'] as String,
-          createdAt: (data['timestamp'] as Timestamp).millisecondsSinceEpoch,
-          metadata:  {'sent_by': data['sent_by']},
-        );
+        final ts = data['timestamp'];
+        final createdAt = ts is Timestamp
+            ? ts.millisecondsSinceEpoch
+            : DateTime.now().millisecondsSinceEpoch;
+
+        if (data['type'] == 'image') {
+          return types.ImageMessage(
+            id: d.id,
+            author: types.User(id: data['senderId']),
+            uri: data['imageUrl'],
+            createdAt: createdAt,
+            metadata: {'sent_by': data['sent_by']},
+            name: 'image',
+            size: 0,
+          );
+        } else {
+          return types.TextMessage(
+            id: d.id,
+            author: types.User(id: data['senderId']),
+            text: data['text'],
+            createdAt: createdAt,
+            metadata: {'sent_by': data['sent_by']},
+          );
+        }
       }).toList();
 
       setState(() => _messages = msgs.reversed.toList());
@@ -117,6 +138,7 @@ class _ChatScreenSPState extends State<ChatScreenSP> {
                 _buildBullet('Be respectful to each other'),
                 _buildBullet('Do not share personal information'),
                 _buildBullet('Keep language clean and professional'),
+                _buildBullet('Chats auto-delete 30 days after booking completion'),
                 // …add more rules as needed
               ],
             ),
@@ -134,6 +156,53 @@ class _ChatScreenSPState extends State<ChatScreenSP> {
                   sentBy:  'sp', // marks this as service-provider
                 );
               },
+              onAttachmentPressed: () async {
+                if (!_spChatEnabled) return;
+
+                final XFile? image = await ImagePicker().pickImage(
+                  source: ImageSource.gallery,
+                );
+                if (image == null) return;
+
+                final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+                final now = DateTime.now().millisecondsSinceEpoch;
+
+                String previewUri;
+
+                if (kIsWeb) {
+                  final bytes = await image.readAsBytes();
+                  previewUri = _bytesToDataUrl(bytes); // 👈 WEB FIX
+                } else {
+                  previewUri = image.path; // 👈 MOBILE FIX
+                }
+
+                // 🔹 Optimistic preview
+                setState(() {
+                  _messages.insert(
+                    0,
+                    types.ImageMessage(
+                      id: tempId,
+                      author: _me,
+                      uri: previewUri,
+                      createdAt: now,
+                      metadata: {'uploading': true, 'sent_by': 'sp'},
+                      name: 'uploading',
+                      size: 0,
+                    ),
+                  );
+                });
+
+                // 🔹 Upload & persist
+                await ChatHelper.sendImageWithFile(
+                  context: context,
+                  chatId: widget.chatId,
+                  sentBy: 'sp',
+                  file: image,
+                );
+              },
+
+
+
               systemMessageBuilder: (types.SystemMessage message) {
                 if (message.id != 'rules') return const SizedBox.shrink();
 
@@ -347,4 +416,11 @@ class _ChatScreenSPState extends State<ChatScreenSP> {
       ),
     );
   }
+}
+
+
+
+String _bytesToDataUrl(Uint8List bytes) {
+  final base64Data = base64Encode(bytes);
+  return 'data:image/jpeg;base64,$base64Data';
 }

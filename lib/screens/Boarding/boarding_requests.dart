@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../shared/highlight_mode.dart';
 import 'OvernightPendingRequests.dart';
+import 'chat_support/ChatScreen.dart';
 import 'chat_support/chat_support.dart';
 import 'confirmed_requests_calendar_view.dart';
 
@@ -1796,7 +1798,7 @@ class _ConfirmedRequestsState extends State<ConfirmedRequests> {
 
           // ✅ Step 5: Trigger payout
           print('🚀 Triggering v2initiatePayout...');
-          final url = "https://us-central1-petproject-test-g.cloudfunctions.net/v2initiatePayout";
+          final url = "https://asia-south1-myfellowpet-prod.cloudfunctions.net/v2initiatePayout";
           final response = await http.post(
             Uri.parse(url),
             headers: {'Content-Type': 'application/json'},
@@ -2515,6 +2517,75 @@ class _BoardingRequestCardState extends State<BoardingRequestCard> {
                     ),
                   ),
                 ),
+                // Your existing Chat Button
+                if (widget.serviceId != null && shopName != null)
+                  Builder(builder: (ctx) {
+                    final chatId = '${widget.serviceId}_${widget.doc.id}';
+                    final me = FirebaseAuth.instance.currentUser!.uid;
+                    final chatDoc = FirebaseFirestore.instance.collection('chats').doc(chatId);
+
+                    return StreamBuilder<DocumentSnapshot>(
+                      stream: chatDoc.snapshots(),
+                      builder: (ctx1, chatSnap) {
+                        final chatData = (chatSnap.data?.data() as Map<String, dynamic>?) ?? {};
+                        final rawLastRead = chatData['lastReadBy_$me'];
+                        final lastRead = (rawLastRead is Timestamp)
+                            ? rawLastRead.toDate()
+                            : DateTime.fromMillisecondsSinceEpoch(0);
+
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: chatDoc.collection('messages').orderBy('timestamp', descending: false).snapshots(),
+                          builder: (ctx2, msgSnap) {
+                            final docs = msgSnap.data?.docs ?? [];
+                            final unreadCount = docs.where((d) {
+                              final ts = (d['timestamp'] as Timestamp?)?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+                              final sender = d['senderId'] as String? ?? '';
+                              return sender != me && ts.isAfter(lastRead);
+                            }).length;
+
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                  color: primaryColor,
+                                  tooltip: 'Chat with parent',
+                                  onPressed: () {
+                                    chatDoc.set({'lastReadBy_$me': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+                                    Navigator.of(ctx).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatScreenSP(
+                                          chatId: chatId,
+                                          serviceId: widget.serviceId,
+                                          shop_name: shopName ?? "",
+                                          bookingId: widget.doc.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                if (unreadCount > 0)
+                                  Positioned(
+                                    top: -4,
+                                    right: -4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                      child: Text(
+                                        '$unreadCount',
+                                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  }),
               ],
             ),
 

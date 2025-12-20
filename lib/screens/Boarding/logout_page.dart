@@ -540,7 +540,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     // API CALL
     final url = Uri.parse(
-        "https://us-central1-petproject-test-g.cloudfunctions.net/sendDeletionEmail");
+        "https://asia-south1-myfellowpet-prod.cloudfunctions.net/sendDeletionEmail");
 
     try {
       final response = await http.post(

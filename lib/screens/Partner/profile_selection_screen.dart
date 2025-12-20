@@ -34,6 +34,17 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
     final notifier = context.watch<UserNotifier>();
 
     return Scaffold(
+      // --- ADDED APPBAR FOR BACK ARROW ---
+      extendBodyBehindAppBar: true, // Keeps the gradient background visible behind the bar
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(), // Goes back to the Welcome/Sign-in page
+        ),
+      ),
+      // ----------------------------------
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -57,6 +68,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SizedBox(height: 40), // Added spacing for the AppBar
                     Icon(Icons.person_search_outlined, size: 60, color: primaryColor.withOpacity(0.8)),
                     const SizedBox(height: 16),
                     Text(
@@ -80,14 +92,16 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
                     const SizedBox(height: 40),
                     if (notifier.ownerProfiles.isNotEmpty) ...[
                       _buildSectionHeader('Owner Profiles'),
-                      ...notifier.ownerProfiles.map((profile) => _buildProfileCard(context, profile)),
+                      ...uniqueProfiles(notifier.ownerProfiles)
+                          .map((profile) => _buildProfileCard(context, profile)),
                       const SizedBox(height: 32),
                     ],
                     _buildAddShopCard(context),
                     const SizedBox(height: 32),
                     if (notifier.employeeProfiles.isNotEmpty) ...[
                       _buildSectionHeader('Employee Roles'),
-                      ...notifier.employeeProfiles.map((profile) => _buildProfileCard(context, profile)),
+                      ...uniqueProfiles(notifier.employeeProfiles)
+                          .map((profile) => _buildProfileCard(context, profile)),
                     ],
                   ],
                 ),
@@ -310,4 +324,8 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
       ),
     );
   }
+}
+List<AppUser> uniqueProfiles(List<AppUser> profiles) {
+  final seen = <String>{};
+  return profiles.where((p) => seen.add(p.serviceId)).toList();
 }

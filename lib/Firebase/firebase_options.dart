@@ -53,12 +53,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDcudksFZPVtfhcdEG57H0zonZo25NMapY',
-    appId: '1:683813995932:web:7ba0c28acc2c57bc193459',
-    messagingSenderId: '683813995932',
-    projectId: 'petproject-test-g',
-    authDomain: 'petproject-test-g.firebaseapp.com',
-    storageBucket: 'petproject-test-g.firebasestorage.app',
-    measurementId: 'G-32JRWNSJEX',
+      apiKey: "AIzaSyAX5NloW5VLyqxK_QQwWzXXLI0zu-mfCLU",
+      authDomain: "myfellowpet-prod.firebaseapp.com",
+      projectId: "myfellowpet-prod",
+      storageBucket: "myfellowpet-prod.firebasestorage.app",
+      messagingSenderId: "442628504378",
+      appId: "1:442628504378:web:78a33db6419de9b42aae03"
   );
 }

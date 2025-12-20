@@ -195,6 +195,8 @@ import '../../services/places_service.dart';
       GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: textColor);
 
       String? _errorText;
+      // Under your other controllers
+      bool _isGstRegistered = false; // Add this
 
       final TextEditingController _ownerNameCtrl = TextEditingController();
       final TextEditingController _emailCtrl = TextEditingController();
@@ -1380,6 +1382,18 @@ import '../../services/places_service.dart';
                 _buildSummaryRow(icon: Icons.location_on_outlined, label: "Full Address", value: _locationController.text),
                 _buildSummaryRow(icon: Icons.schedule_outlined, label: "Operating Hours", value: "${formatTime(_openTime)} - ${formatTime(_closeTime)}"),
                 _buildSummaryRow(icon: Icons.pets_outlined, label: "Pets Serviced", value: formatList(_selectedPets)),
+                // Inside _buildReviewAndConfirmStep -> buildResponsiveSection
+                _buildSummaryRow(
+                    icon: Icons.check,
+                    label: "GST Registered",
+                    value: _isGstRegistered ? "Yes" : "No"
+                ),
+                if (_isGstRegistered)
+                  _buildSummaryRow(
+                      icon: Icons.receipt_long,
+                      label: "GSTIN",
+                      value: _gstinCtrl.text.trim()
+                  ),
                 const Divider(height: 40),
 
                 // --- 🔹 REBUILT FINANCIALS & POLICIES SECTION 🔹 ---
@@ -2417,7 +2431,7 @@ import '../../services/places_service.dart';
             'owner_phone': _phoneCtrl.text.trim(),
             'id_url': idFrontUrl ?? '', 'utility_bill_url': utilityBillUrl ?? '', 'id_with_selfie_url': idWithSelfieUrl ?? '',
             'shop_name': _shopNameCtrl.text.trim(), 'shop_logo': _uploadedLogoUrl ?? '',
-            'bank_ifsc': _ifscCtrl.text.trim(), 'bank_account_num': _accountCtrl.text.trim(), 'pan': _panCtrl.text.trim(), 'gstin': _gstinCtrl.text.trim(),
+            'bank_ifsc': _ifscCtrl.text.trim(), 'bank_account_num': _accountCtrl.text.trim(), 'pan': _panCtrl.text.trim(), 'is_gst_registered': _isGstRegistered, 'gstin': _isGstRegistered ? _gstinCtrl.text.trim() : "",
             'dashboard_phone': _phoneController.text.trim(), 'dashboard_whatsapp': finalDashboardWhatsapp,
             'description': _descriptionController.text.trim(), 'features': validFeatures, 'full_address': _locationController.text.trim(),
             "refund_policy": { for (var p in percentages) p: _RefundCtrls[p]!.text.trim() },
@@ -3315,6 +3329,39 @@ import '../../services/places_service.dart';
                   // ^ ^ ^ END OF NEW SECTION ^ ^ ^
 
                 ]
+            ),
+
+            _buildSectionContainer(
+              title: "Tax & Registration",
+              children: [
+                CheckboxListTile(
+                  title: Text("Are you GST Registered?",
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: textColor)),
+                  value: _isGstRegistered,
+                  activeColor: primaryColor,
+                  onChanged: (val) {
+                    setState(() {
+                      _isGstRegistered = val ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                if (_isGstRegistered) ...[
+                  const SizedBox(height: 16),
+                  _buildTextFormField(
+                    controller: _gstinCtrl,
+                    label: "Enter GSTIN*",
+                    icon: Icons.receipt_long_outlined,
+                    // Tweak: Required only if checkbox is checked
+                    validator: (v) {
+                      if (_isGstRegistered && (v == null || v.trim().isEmpty)) {
+                        return "GSTIN is required if registered";
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ],
             ),
 
             // 3. This new widget call will dynamically build the rate sections

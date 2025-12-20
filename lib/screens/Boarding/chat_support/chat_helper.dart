@@ -1,4 +1,7 @@
 // lib/utils/chat_helper.dart
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
@@ -62,4 +65,81 @@ class ChatHelper {
       'lastUpdated': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+  static final ImagePicker _picker = ImagePicker();
+
+  static Future<void> sendImage({
+    required BuildContext context,
+    required String chatId,
+    required String sentBy,
+  }) async {
+    final XFile? file = await _picker.pickImage(source: ImageSource.gallery);
+    if (file == null) return;
+
+    final Uint8List bytes = await file.readAsBytes();
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = FirebaseStorage.instance
+        .ref('chat_images/$chatId/$fileName');
+
+    await ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    final imageUrl = await ref.getDownloadURL();
+
+    final chatDoc =
+    FirebaseFirestore.instance.collection('chats').doc(chatId);
+
+// save image message
+    await chatDoc.collection('messages').add({
+      'type': 'image',
+      'imageUrl': imageUrl,
+      'senderId': uid,
+      'timestamp': FieldValue.serverTimestamp(),
+      'sent_by': sentBy,
+    });
+
+// update chat header
+    await chatDoc.set({
+      'lastMessage': '📷 Image',
+      'lastUpdated': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<XFile?> pickImage() async {
+    return await ImagePicker().pickImage(source: ImageSource.gallery);
+  }
+
+  static Future<void> sendImageWithFile({
+    required BuildContext context,
+    required String chatId,
+    required String sentBy,
+    required XFile file,
+  }) async {
+    final bytes = await file.readAsBytes();
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    final ref = FirebaseStorage.instance
+        .ref('chat_images/$chatId/${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+    await ref.putData(bytes);
+    final imageUrl = await ref.getDownloadURL();
+
+    await FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .add({
+      'type': 'image',
+      'imageUrl': imageUrl,
+      'senderId': uid,
+      'sent_by': sentBy,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+
 }
+

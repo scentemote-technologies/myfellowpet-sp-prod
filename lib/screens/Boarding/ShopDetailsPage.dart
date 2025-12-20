@@ -367,7 +367,7 @@ class _ShopDetailsPageState extends State<ShopDetailsPage> {
         : rawPhone;
 
     final fnUrl = Uri.parse(
-        'https://us-central1-petproject-test-g.cloudfunctions.net/createContactAndFundAccount'
+        'https://asia-south1-myfellowpet-prod.cloudfunctions.net/createContactAndFundAccount'
     );
 
     final body = jsonEncode({

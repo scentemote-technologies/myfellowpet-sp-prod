@@ -82,7 +82,7 @@ class SubscriptionPlansPage extends StatelessWidget {
                         crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 24,
                         mainAxisSpacing: 24,
-                        childAspectRatio: 1.6,
+                        childAspectRatio: 1.3,
                       ),
                       itemBuilder: (context, index) {
                         final planDoc = plans[index];

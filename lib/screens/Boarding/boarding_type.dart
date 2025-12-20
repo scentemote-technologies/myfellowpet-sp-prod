@@ -67,19 +67,7 @@ class RunTypeSelectionPage extends StatelessWidget {
                     isComingSoon: data['isComingSoon'] ?? true,
                   );
                 }).toList(),
-                // Pet Store tile
-                _RunTypeOption(
-                  'Pet Store',
-                  'Open your pet store with us',
-                  Icons.store_mall_directory_outlined,
-                  PetStoreOnboardingPage(
-                    uid: uid,
-                    phone: phone,
-                    email: email,
-                    serviceId: serviceId ?? '', runType: '',
-                  ),
-                  isComingSoon: false, // enabled
-                ),
+
               ];
 
               return Container(

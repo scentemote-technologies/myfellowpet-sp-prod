@@ -1901,6 +1901,17 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                         ),
                       );
                       break;
+                    case 'subscription':
+                    // REPLACED context.go('/partner/${widget.serviceId}/branches')
+
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (ctx) =>SubscriptionPlansPage(
+                              serviceId: widget.serviceId,
+                            ),
+                        ),
+                      );
+                      break;
                     case 'reviews':
                       _showReviewsDialog(context);
                       break;
@@ -1975,6 +1986,14 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
                         child: ListTile(
                           leading: const Icon(Icons.store_outlined),
                           title: Text('Manage Branches', style: GoogleFonts.poppins()),
+                        ),
+                      ),
+                    if (me?.role == 'Owner')
+                      PopupMenuItem<String>(
+                        value: 'subscription',
+                        child: ListTile(
+                          leading: const Icon(Icons.store_outlined),
+                          title: Text('Manage Subscription', style: GoogleFonts.poppins()),
                         ),
                       ),
                     PopupMenuItem<String>(
@@ -2174,7 +2193,7 @@ class _BoardingDetailsDashboardState extends State<BoardingDetailsDashboard> {
     required String ifsc,
   }) async {
     final url = Uri.parse(
-      'https://us-central1-petproject-test-g.cloudfunctions.net/createContactAndFundAccount',
+      'https://asia-south1-myfellowpet-prod.cloudfunctions.net/createContactAndFundAccount',
     );
 
     try {
