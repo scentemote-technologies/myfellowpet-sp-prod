@@ -260,9 +260,9 @@ class MyAppRoot extends StatelessWidget {
 
     if (kIsWeb &&
         userNotifier.authState == AuthState.authenticated &&
-        userNotifier.serviceId != null) {
+        userNotifier.activeServiceId != null) {
 
-      registerFcmToken(userNotifier.serviceId!);
+      registerFcmToken(userNotifier.activeServiceId!);
     }
 
     return MaterialApp(
@@ -271,6 +271,7 @@ class MyAppRoot extends StatelessWidget {
       home: _getInitialWidget(userNotifier),
     );
   }
+
 
 }
 
