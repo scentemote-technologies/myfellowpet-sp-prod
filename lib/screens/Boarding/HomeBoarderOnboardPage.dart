@@ -1,40 +1,38 @@
-    // lib/screens/ShopDetailsPage.dart
-    import 'dart:async';
-    import 'dart:convert';
-    import 'dart:js_util' as js_util;
-    import 'dart:html' as html;
-    import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:js_util' as js_util;
+import 'dart:html' as html;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-    import 'package:file_picker/file_picker.dart';
-    import 'package:firebase_storage/firebase_storage.dart';
-    import 'package:flutter/material.dart';
-    import 'package:flutter/services.dart';
-    import 'package:flutter_typeahead/flutter_typeahead.dart';
-    import 'package:geolocator/geolocator.dart';
-    import 'package:google_fonts/google_fonts.dart';
-    import 'package:google_maps_flutter/google_maps_flutter.dart';
-    import 'package:image_picker/image_picker.dart';
-    import 'package:intl/intl.dart';
-    import 'package:multi_select_flutter/chip_display/multi_select_chip_display.dart';
-    import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
-    import 'package:multi_select_flutter/util/multi_select_item.dart';
-    import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:multi_select_flutter/chip_display/multi_select_chip_display.dart';
+import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
+import 'package:multi_select_flutter/util/multi_select_item.dart';
+import 'package:http/http.dart' as http;
 import 'package:myfellowpet_sp/screens/Boarding/partner_shell.dart';
 import 'package:myfellowpet_sp/screens/Boarding/roles/role_service.dart';
-    import 'package:provider/provider.dart';
-  import 'package:url_launcher/url_launcher.dart';
-    import 'dart:typed_data';
-
-    import '../../Colors/AppColor.dart';
-  import '../../providers/boarding_details_loader.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:typed_data';
+import '../../Colors/AppColor.dart';
+import '../../providers/boarding_details_loader.dart';
 import '../../services/places_service.dart';
-    import '../../tools/webcam_selfie_widget.dart';
-    class PetType {
-      final String id;
-      final bool display;
+import '../../tools/webcam_selfie_widget.dart';
 
-      PetType({required this.id, required this.display});
-    }
+class PetType {
+   final String id;
+   final bool display;
+   PetType({required this.id, required this.display});
+}
 
     // --- END VISUAL REFRESH ---
 
